@@ -1,0 +1,177 @@
+#!/bin/bash
+
+# Originally from: http://devresources.linux-foundation.org/dev/fumount/script/fumount
+# TODO: accept either dir or device on command line (like umount does)
+#           ie: /mnt/tmp or /dev/hda6
+# TODO: accept relative dirs
+#           ie: cd /mnt; fumount tmp
+
+declare -rx SCRIPT=${0##*/}
+declare -rx VERSION=001
+
+if [ `whoami` != "root" ]; then
+    echo "You must run this as root"
+    exit 1
+fi
+
+# display script usage, then exit
+function usage {
+    printf "usage: $SCRIPT [-i] [-v] dir\n" >&2
+    printf "  -i : interactive mode\n" >&2
+    printf "  -v : verbose\n" >&2
+
+    success=1   # don't print failure message
+    exit 1
+}
+
+# print verbose/debug information
+function debug {
+    if [ -n "$verbose" ]; then
+        printf "$1"
+    fi
+}
+
+# umount was a success
+function success {
+    success=1
+    debug "$mntpoint unmounted\n"
+    exit 0
+}
+
+function on_exit {
+    if [ -z "$success" ]; then
+        printf "unmount failed\n" >&2
+    fi
+}
+
+trap on_exit EXIT
+
+# parse the arguments
+while [ -n "$1" ]; do
+    case $1 in
+    -i)
+        interactive=1
+        ;;
+    -v)
+        verbose=1
+        ;;
+    -*)
+        usage
+        ;;
+    *)
+        if [ -z "$mntpoint" ]; then
+            mntpoint=$1
+        else
+            usage
+        fi
+        ;;
+    esac
+
+    shift
+done
+
+if [ -z "$mntpoint" ]; then
+    usage
+fi
+
+# strip trailing slash from mntpoint
+# surely there must be a better way to do this...
+while [ "`echo "$mntpoint" |grep '/$'`" ]; do
+    mntpoint=${mntpoint%/}
+done
+
+# attempt a regular umount
+tryumount=`umount $mntpoint 2>&1`
+ret=$?
+if [ "`echo $tryumount |grep 'not mounted'`" ]; then
+    printf "%s is not mounted\n" "$mntpoint" >&2
+    if [ -e "$mntpoint" ]; then
+        printf "You must provide the full path (ie: /mnt/tmp)\n" >&2
+    fi
+
+    exit 1
+fi
+
+if [ "`echo $tryumount |grep 'not found'`" ]; then
+    printf "%s not fount\n" "$mntpoint" >&2
+    exit 1
+fi
+
+# did the umount succeed?
+if [ $ret -eq 0 ]; then
+    success
+else
+    # if the filesystem is busy, kill all processes accessing it
+    if [ "`echo $tryumount |grep 'busy'`" ]; then
+        debug "busy... killing all processes accessing the filesystem\n"
+
+        if [ "$interactive" ]; then
+            fuser -ki $mntpoint
+        else
+            fuser -k $mntpoint &> /dev/null
+        fi
+    else
+        printf "%s failed... umount returned %d\n" "$SCRIPT" "$ret" >&2
+        exit 1
+    fi
+fi
+
+# try to umount again
+tryumount=`umount $mntpoint 2>&1`
+ret=$?
+if [ $ret -eq 0 ]; then
+    success
+else
+    if [ "`echo $tryumount | grep 'busy'`" ]; then
+
+        # get the name of the device that is mounted
+        exec 6<&0   # save stdin... better way to do this?
+        exec < /proc/mounts
+        while read line; do
+            mnt=`echo $line |awk '{print $2}'`
+            if [ "$mnt" = "$mntpoint" ]; then
+                device=`echo $line |awk '{print $1}'`
+                break
+            fi
+        done
+        exec 0<&6 6<&-  # restore stdin
+
+        # our first attempt didn't work, do lazy umount to make it easier
+        debug "still busy, doing lazy umount\n"
+
+        if [ "$interactive" ]; then
+            printf "Do a lazy unmount? (y/N)\n"
+            read yn
+            if [ "$yn" != "y" ]; then
+                exit 1
+            fi
+        fi
+
+        umount -l $mntpoint
+
+        # keep trying to kill processes accessing the device. don't exit until
+        # we succeed
+        while [ -n "$device" -a -e "$device" ]; do
+            debug "attempting to kill all processes accessing $device\n"
+
+            if [ "$interactive" ]; then
+                fuser -kmi $device
+            else
+                fuser -km $device &> /dev/null
+            fi
+
+            if [ -z "`fuser -m $device`" ]; then
+                success
+            fi
+        done
+
+        printf "Lazy unmount succeeded, but I was unable to find the\n"
+        printf "device the filesystem was mounted on. There may still be\n"
+        printf "processes accessing the device.\n"
+
+        exit 0
+    else
+        printf "%s failed... umount returned %d\n" "$SCRIPT" "$ret" >&2
+        exit 1
+    fi
+fi

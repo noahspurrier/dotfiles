@@ -1,0 +1,66 @@
+#!/bin/bash
+
+#
+# This will update simple file based databases like ieee-oui.txt.
+# This is intended to be placed in /etc/cron.daily.
+#
+
+LOCKFILE=/var/lock/update-databases
+LOCKTOUCHPID=0
+cd /
+umask 022
+
+on_exit_trap_unlock ()
+{
+	echo "Doing unlock"
+	if [ "${LOCKTOUCHPID}" != "0" ]; then
+		if kill -s 0 ${LOCKTOUCHPID} 2>/dev/null; then
+			kill ${LOCKTOUCHPID}
+		fi
+		lockfile-remove ${LOCKFILE}
+	fi
+}
+
+set_lock ()
+{
+	if type lockfile-create >/dev/null 2>&1; then
+		lockfile-create --retry 1 ${LOCKFILE}
+		lockfile_exit_code=$?
+		if [ ${lockfile_exit_code} -ne 0 ] ; then
+			echo "Unable to run /etc/cron.daily/update_databases."
+			echo "Failed to acquire lock on ${LOCKFILE}."
+			echo "Exited status of lockfile-create: ${lockfile_exit_code}."
+			LOCKFILE=""
+			exit 1
+		fi
+		lockfile-touch ${LOCKFILE} &
+		LOCKTOUCHPID="$!"
+	else
+		LOCKFILE=""
+		LOCKTOUCHPID=0
+	fi
+}
+
+trap on_exit_trap_unlock EXIT
+set_lock
+
+if type update-usbids.sh >/dev/null 2>&1; then
+	update-usbids.sh
+elif type update-usbids >/dev/null 2>&1; then
+	update-usbids
+fi
+
+if type update-pciids >/dev/null 2>&1; then
+	update-pciids
+fi
+
+if [ -d /usr/share/arp-scan ]; then
+	if type get-oui >/dev/null 2>&1; then
+		(cd /usr/share/arp-scan && get-oui)
+	fi
+	if type get-iab >/dev/null 2>&1; then
+		(cd /usr/share/arp-scan && get-iab)
+	fi
+fi
+
+exit 0

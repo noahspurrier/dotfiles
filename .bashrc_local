@@ -1,0 +1,3 @@
+# .bashrc_local
+# This file contains .bashrc settings that are unique to a local machine.
+# This allows me to have all my machines share the same master .bashrc file.

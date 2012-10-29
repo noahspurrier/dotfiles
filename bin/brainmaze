@@ -1,0 +1,499 @@
+#!/usr/bin/env python
+
+"""
+SYNOPSIS
+
+    brainmaze.py [-h, --help] [-v,--verbose] [--version] [--html] [--solve] [NUMBER_ITERATIONS]
+
+DESCRIPTION
+
+    This generates square fractal mazes with no loops. The maze is a spanning
+    tree -- a connected, undirected graph that uses all the vertices in a graph
+    with no cycles.
+
+    The algorithm works like this. First four sub-mazes are generated and
+    arranged into four quadrants. Then they are joined in three random places
+    along the horizontal and vertical boundaries of the four quandrants. This
+    is repeated until you get tired.
+
+        ### ###     ### ###
+        # #  #      # #  #
+        # # ###     # # ###
+                -->   # #
+        # # ###     # # ###
+        # # # #     # # # #
+        ### # #     ##### #
+
+        ### ### ### # #     ### ### ### # #
+        # #  #  #   ###     # #  #  #   ###
+        # # ### ##### #     # # ### ##### #
+          # #   #             # #   #
+        # # ### # ### #     # # ##### ### #
+        # # # # ### ###     # # # # ### ###
+        ##### # # # # #     ##### # # # # #
+                        -->  #
+        ### ### # # ###     ### ### # # ###
+        #     # ### # #     #     # ### # #
+        ####### # ### #     ######### ### #
+           #    #              #    #
+        # ##### ### # #     # ##### ### # #
+        ###  #   #  ###     ###  #   #  ###
+        # # ### ##### #     # # ### ##### #
+
+    Note that all mazes are made up of these "atmomic" mazes:
+
+        # #    ###    ###    ###    # #    ###
+        # #    # #      #    #      ###     #
+        ###    # #    ###    ###    # #    ###
+
+    (c)Copyright 1991, 2012 Noah Spurrier
+    CIS 118
+    Monday, Wednesday class from 1:00 to 3:00
+    Program 10 generates square mazes using a recursive algorithm
+    that I designed. This algorithm works by dividing up a big maze
+    into quadrants and then trying the make mazes in the smaller sections.
+
+EXAMPLES
+
+    ./brainmaze.py
+    ./brainmaze.py 5
+    ./brainmaze.py --solve 3
+    ./brainmaze.py --html
+
+AUTHOR
+
+    Noah Spurrier<noah@noah.org>
+
+LICENSE
+
+    This script is in the public domain, free from copyrights or restrictions.
+
+VERSION
+
+    2
+"""
+
+import sys, os, traceback, optparse
+import time
+import random
+import cgi
+
+WALL = ' '
+PASSAGE = '#'
+
+class Maze:
+
+    """This class stores the state of a maze. It does not contain the algorithm
+    that generates a maze. Note that this stores the maze "graphically" and not
+    as a tree data structure, so it may seem a little confusing if you are
+    expecting structures like nodes and edges. So the maze is literally stored
+    in an array. For example:
+
+     [['#', '#', '#'],
+      ['#', ' ', '#'],
+      ['#', ' ', '#']]
+
+    The advantage of this method is that it is more "visual" -- you can see
+    what is going on just by converting the maze to a string. Of course, later
+    on this would bite me when I wanted to trace paths through the maze. I had
+    to convert it to tree structure, but that becomes yet another fun exercise!
+
+    The size is the number of fractal cells along one side. A single fractal
+    cell is actually made up of up of 4 nodes. This algorithm assumes a square,
+    so both sides get the same size."""
+
+    def __init__ (self, size, init_value):
+
+        self.size = size
+        self.size_x = size
+        self.size_y = size
+        self.m = [init_value] * (self.size_x * self.size_y)
+
+    def get (self, x, y):
+
+        if (x < 0) or (x >= self.size_x):
+            return WALL
+        if (y < 0) or (y >= self.size_y):
+            return WALL
+        return self.m [self.size * y + x]
+
+    def put (self, x, y, value):
+
+        self.m [self.size * y + x] = value
+
+    def __str__ (self):
+
+        s = ''
+        for y in range(self.size):
+            for x in range(self.size):
+                value = self.get(x,y)
+                s = s + value
+            s = s + '\n'
+        return s
+
+    def html_table (self, cell_size=9):
+
+        """This returns the Maze as a string in HTML format."""
+
+        s = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html>
+<head>
+<title>A Brain Maze Fractal</title>
+</head>
+<body bgcolor="#000000" text="#ffffff">
+'''
+        s = s + '\n<!-- \n' + str (self) + '-->\n'
+
+        s = s + '\n<table border="0" cellpadding="0" cellspacing="0">\n'
+        for x in range (self.size):
+            s = s + '<tr>\n'
+            for y in range (self.size):
+                value = self.get (x,y)
+                if value == WALL:
+                    s = s + '<td  width="%d" height="%d" bgcolor="#000000"></td>\n' % (cell_size, cell_size)
+                elif value == PASSAGE:
+                    s = s + '<td  width="%d" height="%d" bgcolor="#ffffff"></td>\n' % (cell_size, cell_size)
+                elif value == 'B':
+                    s = s + '<td  width="%d" height="%d" bgcolor="#ff0000"></td>\n' % (cell_size, cell_size)
+                else:
+                    s = s + '<td  width="%d" height="%d" bgcolor="#00ff00"></td>\n' % (cell_size, cell_size)
+            s = s + '</tr>\n'
+        s = s + '''</table>\n\n</body></html>'''
+        return s
+
+def mergemaze (g1, g2, g3, g4):
+
+    """This merges four small mazes into a bigger maze. They are arranged into
+    a 2x2 pattern. The small mazes, g1,g2,g3,g4, should all be the same size.
+    """
+
+    subsize = g1.size
+    result = Maze (subsize * 2 + 1, PASSAGE)
+
+    for x in range(g1.size):
+        for y in range(g1.size):
+            g1_value = g1.get(x,y)
+            g2_value = g2.get(x,y)
+            g3_value = g3.get(x,y)
+            g4_value = g4.get(x,y)
+
+            result.put(x, y, g1_value)
+            result.put(x+subsize+1, y, g2_value)
+            result.put(x, y+subsize+1, g3_value)
+            result.put(x+subsize+1, y+subsize+1, g4_value)
+
+    cc = subsize
+    for c in range (result.size):
+        result.m [(cc * result.size) + c] = WALL
+        result.m [(c * result.size) + cc] = WALL
+
+    return result
+
+
+def join_horiz_left (maze, subsize):
+
+    """
+    X X
+    |
+    X X
+    """
+
+    while 1:
+        x = random.randrange (subsize + 1)
+        v1 = maze.get (x, subsize - 1)
+        v2 = maze.get (x, subsize)
+        v3 = maze.get (x, subsize + 1)
+        if v1 == PASSAGE and v2 == WALL and v3 == PASSAGE:
+            maze.put (x, subsize, PASSAGE)
+            break
+
+def join_horiz_right (maze, subsize):
+
+    """
+    X X
+      |
+    X X
+    """
+
+    while 1:
+        x = random.randrange (subsize + 1) + subsize
+        v1 = maze.get (x, subsize - 1)
+        v2 = maze.get (x, subsize)
+        v3 = maze.get (x, subsize + 1)
+        if v1 == PASSAGE and v2 == WALL and v3 == PASSAGE:
+            maze.put (x, subsize, PASSAGE)
+            break
+
+def join_vert_top (maze, subsize):
+
+    """
+    X-X
+
+    X X
+    """
+
+    while 1:
+        y = random.randrange (subsize + 1)
+        v1 = maze.get (subsize - 1, y)
+        v2 = maze.get (subsize, y)
+        v3 = maze.get (subsize + 1, y)
+        if v1 == PASSAGE and v2 == WALL and v3 == PASSAGE:
+            maze.put (subsize, y, PASSAGE)
+            break
+
+def join_vert_bottom (maze, subsize):
+
+    """
+    X X
+
+    X-X
+    """
+
+    while 1:
+        y = random.randrange (subsize + 1) + subsize
+        v1 = maze.get (subsize - 1, y)
+        v2 = maze.get (subsize, y)
+        v3 = maze.get (subsize + 1, y)
+        if v1 == PASSAGE and v2 == WALL and v3 == PASSAGE:
+            maze.put (subsize, y, PASSAGE)
+            break
+
+def join4 (g1, g2, g3, g4):
+
+    """ This function joins together four little mazes into one big maze. This
+    function calls mergemaze(). This function then tries to figure out a good
+    place to connect the mazes. It does this by hunting through the middle
+    horizontal or vertical until it finds a space that has a PASSAGE both above
+    and below OR both left and right. Then it puts a PASSAGE between those two
+    PASSAGEs. The reason there are two choices is because there must be a total
+    of three connectors between the four mazes. Two connecting PASSAGEs must be
+    on the same row OR column, the third PASSAGE must be in the line at right
+    angles two the first two. (I NEED A DAMN PICTURE TO EXPLAIN THIS PROPERLY!)
+    So you can have two connectors in a row and one connector in a column or
+    you can have one connector in a row and two connectors in a column. It's
+    YOUR choice. But they have to be in that configuration. In other words you
+    just have to make sure that the row and column has at least one connector.
+    Jeeze...
+
+    To join four mazes together I connect them in three random places. The
+    connections occur in the horizontal or vertical wall between the four
+    mazes. They may also connect in the middle if there happens to be two
+    connections on either side. That means that the third connection is
+    dependant on the first two. And THAT means there is an order dependency. To
+    remove this dependency I have to add another random step -- I have to
+    randomly choose to connect horizontally or vertically first."""
+
+    suppress_choice = random.randrange(4)
+    result = mergemaze (g1, g2, g3, g4)
+    subsize = g1.size
+
+    # Vertical first if 0 or 1.
+    if suppress_choice == 0 or suppress_choice == 1:
+        join_vert_top (result, subsize)
+        join_vert_bottom (result, subsize)
+        if suppress_choice != 0:
+            join_horiz_left (result, subsize)
+        if suppress_choice != 1:
+            join_horiz_right (result, subsize)
+
+    # Horizontal first if 2 or 3.
+    if suppress_choice == 2 or suppress_choice == 3:
+        join_horiz_left (result, subsize)
+        join_horiz_right (result, subsize)
+        if suppress_choice != 2:
+            join_vert_top (result, subsize)
+        if suppress_choice != 3:
+            join_vert_bottom (result, subsize)
+
+    return result
+
+def build (size):
+
+    """This is the main recursive method used to build the maze. Note that this
+    generates a square maze. """
+
+    if size <= 1: # Terminate the recursive loop.
+        g1 = Maze (1, PASSAGE)
+        g2 = Maze (1, PASSAGE)
+        g3 = Maze (1, PASSAGE)
+        g4 = Maze (1, PASSAGE)
+    else:
+        g1 = build (size - 1)
+        g2 = build (size - 1)
+        g3 = build (size - 1)
+        g4 = build (size - 1)
+
+    result = join4 (g1, g2, g3, g4)
+    return result
+
+def build_tree_from_maze (maze):
+
+    """This turns a maze array into a tree. The algorithm that builds mazes
+    doesn't use a tree data structure. It builds them graphically which does not
+    provide easy access to the data structure. This function produces a tree
+    from the maze graphic representation. """
+
+    tree = {}
+    for y in range (0, maze.size_y):
+        for x in range (0, maze.size_x):
+            if maze.get(x,y) == PASSAGE:
+                tree[(x,y)] = []
+                if maze.get(x-1,y) == PASSAGE: tree[(x,y)].append((x-1,y))
+                if maze.get(x+1,y) == PASSAGE: tree[(x,y)].append((x+1,y))
+                if maze.get(x,y-1) == PASSAGE: tree[(x,y)].append((x,y-1))
+                if maze.get(x,y+1) == PASSAGE: tree[(x,y)].append((x,y+1))
+    return tree
+
+def build_adjacency_distance_matrix (node_list):
+
+    """This builds a dictionary that stores the distance from any point to any
+    other point. This only initializes the matrix, so it just fills in the
+    distance from a node to the immediate neighbor. Later the matrix will
+    filled-in using fill_adjacency_distance_matrix. This is intended as an
+    illustration of the algorithm, not as an illustration of an efficient data
+    structure. """
+
+    adj_matrix = {}
+    for key_node in node_list:
+        adj_matrix[key_node] = {}
+        for node in node_list:
+            dist = None
+            if node == key_node:
+                dist = 0
+            elif node in node_list[key_node]:
+                dist = 1
+            adj_matrix[key_node][node] = dist
+    return adj_matrix
+
+def memoize (f):
+
+    """This is a decorator which adds memoization to a function."""
+
+    cache= {}
+    def memoize_function (*x):
+        if x not in cache:
+            cache[x] = f(*x)
+        return cache[x]
+    return memoize_function
+
+class MemoizeMutable:
+    def __init__(self, fn):
+        self.fn = fn
+        self.memo = {}
+    def __call__(self, *args, **kwds):
+        import cPickle
+        str = cPickle.dumps(args, 1)+cPickle.dumps(kwds, 1)
+        if not self.memo.has_key(str):
+            self.memo[str] = self.fn(*args, **kwds)
+        return self.memo[str]
+
+def fill_adjacency_distance_matrix (adj_matrix):
+
+    """This takes the adjacency distance matrix and fills in all the None
+    entries. When done this will yield a matrix that will tell you the distance
+    between any two point in the maze tree. This is slow -- exponential,
+    O(c^N)"""
+
+    done = False
+    while not done:
+        done = True
+        for key_node, dist_dict in adj_matrix.items():
+            for node, dist in dist_dict.items():
+                if dist is None:
+                    dist = get_distance (adj_matrix, key_node, node)
+                    if dist is not None:
+                        dist_dict[node] = dist
+                        adj_matrix[key_node] = dist_dict
+                    else:
+                        done = False
+    return adj_matrix
+
+def get_distance (adj_matrix, node1, node2):
+
+    """If possible this returns the distance between two nodes. If the distance
+    cannot be determined then it returns None. If the distance is known it is
+    simply returned. Otherwise, this will look one level deep to see if the
+    distance from the next node is known. """
+
+    dist = adj_matrix[node1][node2]
+    if dist is not None:
+        return dist
+    for node3 in adj_matrix[node1].keys():
+        if node3 == node1:
+            continue
+        dist = adj_matrix[node1][node3]
+        # Only consider the nodes directly connected to this node.
+        if dist != 1:
+            continue
+        deeper_dist = adj_matrix[node3][node2]
+        if deeper_dist is None:
+            continue
+        return dist + deeper_dist
+    return None
+
+def main ():
+
+    global options, args
+
+    # If running as a CGI then force HTML output.
+    if os.environ.has_key('REQUEST_METHOD'):
+        options.html = True
+
+    if options.html:
+        print "Content-Type: text/html"
+        print
+
+    my_maze = build(args[0])
+
+    if options.solve:
+        if options.verbose: print "Solving maze..."
+        tree = build_tree_from_maze (my_maze)
+        adj = build_adjacency_distance_matrix (tree)
+        print "fill_adjacency_distance_matrix"
+        print time.time()
+        adj = fill_adjacency_distance_matrix (adj)
+        print time.time()
+        max_d = None
+        for key_node, dist_dict in adj.items():
+            for node, dist in dist_dict.items():
+                if dist is not None:
+                    if max_d is None or adj[max_d[0]][max_d[1]] <= dist:
+                        max_d=(key_node, node)
+        if options.verbose: print "distance from node",max_d[0],"to node",max_d[1], "->", adj[max_d[0]][max_d[1]]
+        # Mark the beginning and end of the two most distant nodes.
+        my_maze.put(max_d[0][0],max_d[0][1],'B')
+        my_maze.put(max_d[1][0],max_d[1][1],'E')
+
+    if options.html:
+        print my_maze.html_table(9)
+    else:
+        print str(my_maze)
+
+if __name__ == '__main__':
+    try:
+        start_time = time.time()
+        parser = optparse.OptionParser(formatter=optparse.TitledHelpFormatter(), usage=globals()['__doc__'], version='2')
+        parser.add_option ('-v', '--verbose', action='store_true', default=False, help='verbose output')
+        parser.add_option ('--html', action='store_true', default=False, help='Generate output in HTML.')
+        parser.add_option ('--solve', action='store_true', default=False, help='Show beginning and end of longest path through maze.')
+        (options, args) = parser.parse_args()
+        if len(args) < 1:
+            args.append (4)
+        else:
+            args[0] = int(args[0])
+        if options.verbose: print time.asctime()
+        main()
+        if options.verbose: print time.asctime()
+        if options.verbose: print 'TOTAL TIME IN MINUTES:',
+        if options.verbose: print (time.time() - start_time) / 60.0
+        sys.exit(0)
+    except KeyboardInterrupt, e: # Ctrl-C
+        raise e
+    except SystemExit, e: # sys.exit()
+        raise e
+    except Exception, e:
+        print 'ERROR, UNEXPECTED EXCEPTION'
+        print str(e)
+        traceback.print_exc()
+        os._exit(1)
+

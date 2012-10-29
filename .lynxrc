@@ -1,0 +1,13 @@
+show_dotfiles=on
+dir_list_style=MIXED_STYLE
+user_mode=NOVICE
+preferred_language=en
+keypad_mode=NUMBERS_AS_ARROWS
+accept_all_cookies=TRUE
+verbose_images=on
+file_editor=vim
+vi_keys=on
+KEYMAP:q:ABORT
+KEYMAP:^U:UP_HALF
+KEYMAP:^D:DOWN_HALF
+

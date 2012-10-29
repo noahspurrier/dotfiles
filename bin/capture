@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# Window capture
+#
+# This captures screenshot sequences of a window.
+# The snapshot captures are saved to PNG files.
+# When done an NTSC mpeg4 video is created (in an AVI container).
+#
+# To use, start this script. Use the cross-hair cursor to
+# select a window. Every time you press Enter a snapshot
+# is captured. Enter q to stop capturing. An AVI video file
+# will then be created.
+#
+# Dependencies: ImageMagick and Mplayer tools
+# Based on a script by Chad Files.
+#
+# Noah Spurrier 2007
+#
+# TODO Need to check for dependencies:
+# TODO mpeg2encode
+# TODO mencoder
+# TODO xwininfo
+# TODO import, convert
+#
+
+i=1
+echo "Use the cursor and select the window you want to capture."
+WINDOW_ID=`xwininfo | grep "Window id:" | awk '{print $4}'`
+while [ 1 ]
+do
+    x=$[i+100000000]; # used to zero pad the filename
+    echo "Enter q to stop capturing frames."
+    echo -e "Press Enter to capture frame ${x/1/}: \c "
+    read RESPONSE
+    case "${RESPONSE}" in
+        [qQ]*)
+            break
+            ;;
+    esac
+    # sleep 1
+    #xwd -id ${WINDOW_ID} | xwdtopnm | pnmtopng > "${x/1/}.png"
+    import +dither -depth 8 -frame -window ${WINDOW_ID} "${x/1/}.png"
+    i=$(( $i + 1 ))
+done
+
+# convert PNG sequences to mpeg4 video at 1 frame every two seconds.
+#mogrify -antialias -resize 720x486! 0*.png
+mencoder "mf://*.png" -mf fps=0.5 -o capture.avi -ovc lavc -lavcopts vcodec=mpeg4
+
+#convert -antialias -resize 720x486! -delay 200 0*.png capture.m2v

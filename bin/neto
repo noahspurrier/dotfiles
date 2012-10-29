@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# neto -- Network Overview
+#
+# DESCRIPTION
+#
+#     This prints an overview of each network interface.
+#
+# AUTHOR
+#
+#     Noah Spurrier <noah@noah.org>
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible.
+#     This license identical to the ISC License and is registered with and
+#     approved by the Open Source Initiative. For more information vist:
+#         http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c) 2010, Noah Spurrier <noah@noah.org>
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# VERSION
+#
+#     Version 1
+#
+
+# TODO Add LINK state (ethernet link).
+# TODO Add MANAGED state (is dhclient handling this if? Is Network Manager?)
+
+
+IF_LIST=$(ip -o link | sed -n -e "s/^[0-9]\+:[ ]\+\([a-zA-Z0-9]\+\):.*/\1/p")
+( for net_if in ${IF_LIST}; do
+    updown=$(ip -o addr show ${net_if} | sed -n -e "s/.*${net_if}:.*<.*\(UP\).*>.*/\1/p")
+    [ -z ${updown} ] && updown="DOWN"
+    macaddr=$(ip -o link show ${net_if} | sed -n -e "s/^.*link\/ether[ ]\+\([[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]\).*/\1/p")
+    [ -z ${macaddr} ] && macaddr="NO_MAC"
+    ipaddr=$(ip addr show ${net_if} | sed -n -e "s/.*inet \([[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\).*/\1/p")
+    ipaddr=$(echo ${ipaddr})
+    [ -z ${ipaddr} ] && ipaddr="NO_IP"
+    echo "${net_if} ${updown} ${macaddr} ${ipaddr}"
+done ) | column -t -n
+
+# ip -o link | sed -n -e "s/^[0-9]\+:[ ]\+\([a-zA-Z0-9]\+\):.*link\/ether[ ]\+\([[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]\).*/\1 \2/p"
+

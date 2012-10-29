@@ -1,0 +1,50 @@
+#!/bin/sh
+# 
+# NAME
+#
+#     avi2dvd
+# 
+# SYNOPSIS
+#
+#     avi2dvd my_video.avi
+#
+# DESCRIPTION
+# 
+#     This burns an AVI video to a DVD-Video suitable for playing in a
+#     stand-alone DVD player. Note that this doesn't generate a DVD Menu,
+#     Subtitles, Chapters, Extra Audio tracks, Content Scramble System or any
+#     other optional DVD features -- this just produces the simplest DVD that
+#     will work in most players. This assumes a wide-screen video format. This
+#     will leave a directory, dvd/, in the current working working directory
+# 
+# LICENCE
+# 
+#     public domain
+# 
+# EXAMPLES
+# 
+#     Burn AVI to DVD_Video:
+#
+#         avi2dvd my_video.avi
+# 
+# DEPENDENCIES
+#
+#     mencoder dvdauthor growisofs
+#
+# VERSION
+#
+#     $Id: avi2dvd 264 2008-05-22 23:48:42Z root $
+
+AVI_FILENAME=$1
+BASENAME="${AVI_FILENAME%.}"
+MPEG_FILENAME="$BASENAME.mpg"
+mencoder -oac lavc -ovc lavc -of mpeg -mpegopts format=dvd:tsaf \
+-vf scale=720:480,harddup -srate 48000 -af lavcresample=48000 \
+-lavcopts vcodec=mpeg2video:vrc_buf_size=1835:vrc_maxrate=9800:vbitrate=5000:\
+keyint=18:vstrict=0:acodec=ac3:abitrate=192:aspect=16/9 -ofps 30000/1001 \
+-o "$MPEG_FILENAME" "$AVI_FILENAME"
+dvdauthor -o dvd/ -t "$MPEG_FILENAME"
+dvdauthor -o dvd/ -T
+growisofs -dvd-compat -dvd-video -V "$BASENAME" -Z /dev/dvd dvd/
+
+#eject

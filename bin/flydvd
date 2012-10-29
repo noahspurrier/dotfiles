@@ -1,0 +1,65 @@
+#!/bin/sh
+
+# 
+# NAME
+#
+#     flydvd
+# 
+# SYNOPSIS
+#
+#     flydvd [file or directory]
+#
+# DESCRIPTION
+# 
+#     This burns files to a DVD on the fly. This depends on mkisofs, bfr, and
+#     growisofs. See mkisofs manpage for details about file specification.
+#     Arguments passed to this script will be passed to mkisofs.
+# 
+# LICENCE
+# 
+#     public domain
+# 
+# EXAMPLES
+# 
+#     Burn files tn DVD:
+#         flydvd [file1 file2 ... ]
+#     
+#     Burn directory to DVD:
+#         flydvd [directory]
+#     
+#     Change file and directory names/path on DVD on the fly:
+#         flydvd name=[file1] path/to=[file2] name=[directory]
+#         (see mkisofs manpage -graft-points option for syntax details)
+# 
+# DEPENDENCIES
+# 
+#     bfr
+#         http://www.glines.org/software/bfr.html
+#         On Ubuntu Linux try:
+#         sudo apt-get -y -q install bfr
+#
+
+DVD_WRITER=/dev/dvd
+BIN_MKISOFS=`which mkisofs`
+BIN_BUFFER=`which bfr`
+BIN_GROWISOFS=`which growisofs`
+
+# -r - Rock Ridge extensions with useful ownership and modes.
+# -J - Joliet extensions
+# -allow-multidot - Allow filenames with multiple periods.
+# -allow-leading-dots - Allow filesname that start with a period.
+# -graft-points - Rename files, new_name=source_name
+OPT_MKISOFS="-r -J -allow-multidot -allow-leading-dots -graft-points"
+OPT_MKISOFS="-r -J -graft-points"
+
+OPT_BUFFER="-b 128m -p -i 100% -m 10% -t 120 -T 95%"
+
+# /dev/fd/0 is a device file that represents stdin.
+OPT_GROWISOFS="-dvd-compat -Z $DVD_WRITER=/dev/fd/0"
+
+#$BIN_MKISOFS $OPT_MKISOFS "$@" | \
+$BIN_MKISOFS $OPT_MKISOFS -- "$@" | \
+$BIN_BUFFER $OPT_BUFFER | \
+$BIN_GROWISOFS $OPT_GROWISOFS
+#eject
+

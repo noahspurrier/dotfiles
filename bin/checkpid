@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# example: checkpid ssh 12345
+
+CMD=$1
+PID=$2
+for QPID in $(ps -C $CMD -o pid=); do
+    if [ $QPID = $PID ]; then
+        echo "running"
+        exit 0
+    fi
+done
+echo "not running"
+exit 1

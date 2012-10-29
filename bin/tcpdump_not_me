@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# This shows all network traffic except that for the current ssh connection.
+# This allows running tcpdump remotely over ssh.
+
+if [ ! -z "$SSH_CONNECTION" ]; then
+    expression=`echo "$SSH_CLIENT" | sed 's/.*:\([0-9].*\) [0-9]* \([0-9]*\)$/not \\( host \1 and port \2 \\)/'`
+fi
+tcpdump $* $expression

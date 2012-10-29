@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# This is a postinstall script run by the .dotfiles_install script.
+
+# These files should always have secure permissions.
+chmod -f 600 .auth* >/dev/null 2>&1
+chmod -f 700 .mutt >/dev/null 2>&1
+chmod -f 600 .mutt/muttrc_local >/dev/null 2>&1
+# OpenSSH by default will ignore these files unless the permissions are set correctly.
+chmod -f 600 .ssh/id_dsa >/dev/null 2>&1
+chmod -f 644 .ssh/id_dsa.pub >/dev/null 2>&1
+chmod -f 600 .ssh/id_rsa >/dev/null 2>&1
+chmod -f 644 .ssh/id_rsa.pub >/dev/null 2>&1
+
+# This sets some Gnome options, including 'focus follows mouse' and
+# separate horizontal and vertical window maximization keys.
+if type gconftool-2 >/dev/null 2>&1; then
+	gconftool-2 --type string --set /apps/metacity/general/focus_mode 'mouse'
+	gconftool-2 --type boolean --set /apps/metacity/general/auto_raise false
+	gconftool-2 --type string --set /apps/compiz-1/general/screen0/options/toggle_window_maximized_vertically_key '<Control><Alt>v'
+	gconftool-2 --type string --set /apps/compiz-1/general/screen0/options/toggle_window_maximized_horizontally_key '<Control><Alt>h'
+	gconftool-2 --type=string --set /apps/compiz-1/general/screen0/options/show_desktop_key '<Control><Alt>d'
+	# This shows the old path to these settings. Note that 'compiz' and 'allscreens' have been replaced with 'compiz-1' and 'screen0'.
+	#gconftool-2 --type=string --set /apps/compiz/general/allscreens/options/toggle_window_maximized_horizontally_key '<Control><Alt>h'
+fi
+
+# This is a hook so that the local user can have a custom
+# script run every time the .dotfiles_postinstall script is run.
+[ -r ~/.dotfiles.local ] && chmod 755 ~/.dotfiles.local && ~/.dotfiles.local

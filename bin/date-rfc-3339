@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# This sets the default output format of `date` to RFC-3339. For example:
+#         2010-08-03 17:32:14-07
+# See also .bash_aliases for bash functions 'epoch' and 'epoch-to-rfc-3339'.
+# This is a trivial wrapper around the `date` utility.
+# I did this because I couldn't remember the option "--rfc-3339=seconds".
+# I don't have to remember the script name because I can just
+# use tab completion. I didn't make this an alias because I wanted to
+# be able to call this from inside tools like Vim. For example,
+# in Vim I can type the following to insert a time-stamp:
+#         :r!date-rfc-3339
+
+# This format is similar to --rfc-3339, but this shortens the time-zone
+# offset to the minimum number of digits necessary. For example:
+#         2010-08-03 17:32:14-07
+# instead of:
+#         2010-08-03 17:32:14-07:00
+date "+%F %T%:::z" "$@"
+# This adds weekday name and month name:
+# date "+%F %T%:::z (%A %B)"

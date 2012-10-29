@@ -1,0 +1,6 @@
+#vo=x11
+vo=xv
+zoom=yes
+framedrop = yes
+stop-xscreensaver = "yes"
+#heartbeat-cmd="xscreensaver-command -deactivate &"

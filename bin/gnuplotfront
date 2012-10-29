@@ -1,0 +1,306 @@
+#!/usr/local/bin/perl
+
+#
+# Gnuplotfront
+# A command-line front end for gnuplot.
+# Copyright (C) 1992-1996 by John Heidemann <johnh@isi.edu>.
+#
+# This program is distributed under the GNU public license, version 2.
+#
+# $Id: gnuplotfront,v 1.6 1996/03/29 00:12:09 johnh Exp $
+#
+
+sub usage {
+    print <<'END';
+usage: $0 [options]
+
+Gnuplotfront is a front-end to gnuplot to make its user-interface more
+command-line and shell-script friendly.
+
+Gnuplot assumes that data comes through stdin (or from a data command);
+outputs postscript to stdout.
+
+Options are any valid gnuplot command, proceeded by a dash.
+Note that your shell will require quoting of multi-word arguments.
+
+There are two changes to standard gnuplot commands.
+First, the "plot" command is replaced with "data".
+Second, any modifiers to plot must come before the data command
+(in gnuplot they would normally come after the plot command).
+
+Second, if there is no data command, then we read data from stdin.
+
+
+
+EXAMPLES
+--------
+
+The command
+
+   gnuplotfront \
+       -set logscale xy \
+       -set xlabel 'file size (bytes)' -set ylabel 'bandwidth (bits/sec)' \
+       -set title 'bandwidth vs. file size' < axe_measure.dat >axe_measure.ps
+
+is the equivalent of this gnuplot script:
+
+	set terminal postscript eps "Helvetica" 22
+	set output "axe_measure.ps"
+	set logscale xy
+	set xlabel "File Size (bytes)"
+	set ylabel "Bandwidth (bits/sec)"
+	set title "Bandwidth Vs File Size"
+	plot "arpa/bwFile.dat"
+
+
+and 
+
+    gnuplotfront \
+	-set nokey \
+	-set logscale x \
+	-set xrange '[1e2:1e8]' -set yrange '[0:10e6]' \
+	-set xlabel 'File Size (bytes)' -set ylabel 'Bandwidth (bits/sec)' \
+	-set title 'Bandwidth vs. File Size (axe and vgb)' \
+	-using 1:2:3 -with errorbars -data vgbBUAS.dat \
+	-using 1:2:4:5 -with errorbars -data vgbBUAS.dat \
+	-using 1:2 -with lines -data vgbBUAS.dat >vgbBUAS.ps
+
+is equivalent to
+
+	#!/local/bin/gnuplot
+	set terminal postscript eps "Helvetica" 22
+	set output "./vgbBUAS.ps"
+	set nokey
+	set logscale x
+	set xrange [1e2:1e8]
+	set yrange [0:10e6]
+	set xlabel "File Size (bytes)"
+	set ylabel "Bandwidth (bits/sec)"
+	set title "Bandwidth Vs File Size (Axe and Vgb)"
+	plot "./vgbBUAS.dat" using 1:2:3 with errorbars 1
+	plot "./vgbBUAS.dat" using 1:2:4:5 with errorbars 2
+	plot "./vgbBUAS.dat" using 1:2 with lines 3
+
+
+MOTIVATION
+----------
+
+gnuplotfront is as verbose as gnuplot scripts.  Why use it?
+Because it works much better in shell scripts than stock gnuplot.
+In stock gnuplot, if your data comes from stdin you must create
+(and later remove) a temporary file.  If you want to parameterize
+the arguments of a series of plots, you have to create a temporary
+plot script.  This kind of pain is handled by gnuplotfront.
+
+For example, here is a Perl script which produces a series of related graphs:
+#!/home/johnh/BIN/perl5
+
+for $graph_options (
+    'Bandwidth Vs File Size (Axe and Vgb);vgbBUAS;Bandwidth (bits/sec);[1e2;1e8]',
+    'Start Latency Vs File Size (Axe and Vgb);vgbSLAS;Start Latency (sec);[.001:10]',
+    'Xfer Latency Vs File Size (Axe and Vgb);vgbXLAS;Xfer Latency (sec);[.007:.08]'
+    ) {
+    ($title, $file, $ylabel, $yrange) = split(/;/, $graph_options);
+    system ("gnuplotfront -set nokey -set xrange '[1e2:1e8]' -set yrange '$yrange' -set logscale x -set xlabel 'File Size (bytes)' -set ylabel '$ylabel' -set title '$title' -using 1:2:3 -with errorbars -data $file.dat -using 1:2:4:5 -with errorbars -data $file.dat -using 1:2 -with lines -data $file.dat >$file.ps");
+};
+
+
+
+BUGS
+----
+
+I have not exhaustively tested gnuplotfront with all gnuplot commands.
+Gnuplotfront needs to understand the quoting used by each command;
+it may blow it if run on commands which I have failed to test.
+
+Gnuplotfront is not exactly stellar code.  See the comments in the
+code for reasoning.
+
+
+COMMENTS AND NEW VERSIONS
+-------------------------
+
+Comments about gnuplotfront are welcome; send mail to <johnh@isi.edu>.
+The latest version will be available on the web from
+<http://www.isi.edu/~johnh/SOFTWARE/gnuplotfront.html>.
+
+END
+    exit 1;
+}
+
+
+#
+# This code is pretty gross;
+# it's evolved over time.
+# My apologies.  -johnh, 31-Jan-96
+#
+
+
+@tmpfiles = ();
+$tmpseq = 0;
+sub tmpfile {
+	local($fn);
+	$fn = "/tmp/gnuplotfront.$$.$tmpseq";
+	$tmpseq++;
+	push (@tmpfiles, $fn);
+	return $fn;
+}
+
+
+
+$debug = 0;
+
+
+$master = &tmpfile;
+open (MASTER, ">$master") || die("Cannot open $master");;
+#print STDERR "master = $master\n";
+
+$output = &tmpfile;
+
+@datas = ();
+
+%outkey = &tokeys("set");
+$inkey_regexp = &toregexp("title,with,using");
+$requires_dquotes_regexp = &toregexp("title,set title,set xlabel,set ylabel,set terminal postscript \\w+");
+
+$inkey_eval = 'scalar ($a =~ m/' . $inkey_regexp . '/)';
+$requires_dquotes_eval = 'scalar ($a =~ m/' . $requires_dquotes_regexp . '/)';
+
+
+
+print MASTER "set output '$output'\n";
+
+$delay = 0;
+$terminal_set = 0;
+
+#
+# Argument parsing is kind of ad hoc.
+#
+while ($#ARGV >= 0) {
+	$a0 = $ARGV[0];
+	&usage if ($a0 eq '-?');
+
+	# No commands can being with digits (so that we're not fooled by
+	# negative numeric arguments).  Bug reported by Asvhin Goel
+	# <ashvin@ficus.cs.ucla.edu>.
+	if (! (($key) = $a0 =~ /^[-@]([^0-9].*)$/)) {
+
+		if ($a0 =~ /\s/ || $use_dquotes) {
+			$w = " \"$a0\"";
+		} else {
+			$w = " $a0";
+		};
+		if ($delay) {
+			$delayed_args .= $w;
+		} else {
+			print MASTER $w;
+		};
+
+		$fullkey .= " $a0";
+		$a = $fullkey;
+		$use_dquotes = (eval $requires_dquotes_eval);
+		$terminal_set++ if ($fullkey eq "set terminal");
+		
+	} else {
+
+		print MASTER "\n";
+
+		$a = $key;
+		if ($key eq 'data') {
+			&process_data($ARGV[1]);
+			shift;
+		} elsif ($key eq 'debug') {
+			$debug++;
+		} elsif ($outkey{$key}) {
+			print MASTER $key;
+			$delay = 0;
+		} elsif (eval $inkey_eval) {
+			$delayed_args .= " $key";
+			$delay = 1;
+		} else {
+			die ("Unknown option -$key.\n");
+		};
+
+		$a = $key;
+		$use_dquotes = (eval $requires_dquotes_eval);
+		$fullkey = $key;
+	};
+
+	shift;
+};
+
+print MASTER "\n";
+
+&process_data('-') if ($#datas == -1);
+
+print MASTER "set terminal postscript eps \"Helvetica\" 22\n"
+	if (! $terminal_set);
+
+print MASTER "plot ";
+for ($i=0; $i<=$#datas; $i++) {
+	print MASTER "'$datas[$i]'$args[$i]";
+	print MASTER ", " if ($i < $#datas);
+};
+print MASTER "\n";
+
+close (MASTER);
+
+if ($debug) {
+	print "master = $master\n";
+	exit 0;
+};
+
+open (GNUPLOT, "gnuplot $MASTER <$master |") || die("Cannot run gnuplot.\n");
+while (<GNUPLOT>) { print STDERR $_; };
+close (GNUPLOT);
+
+open (OUTPUT, "< $output") || die("Cannot open $output.\n");
+while (<OUTPUT>) { print $_; };
+close (OUTPUT);
+
+unlink @tmpfiles
+	if (!$debug);
+
+exit (0);
+
+
+
+sub process_data {
+	local ($fn) = $_[0];
+	local ($n) = $#datas+1;
+
+	open (IN, "< $fn") || die("cannot open $fn\n");
+	$datas[$n] = &tmpfile;
+	open (OUT, "> $datas[$n]") || die("Cannot open $datas[$n]");
+
+	$args[$n] = $delayed_args;
+	$delayed_args = "";
+	while (<IN>) {
+		if (/^@(.*)$/) {
+			$args[$n] .= " $1 ";
+		} else {
+			print OUT $_;
+		};
+	};
+
+	close (IN);
+	close (OUT);
+};
+
+
+sub tokeys {
+	local (%keys, @keys, $i);
+	@keys = split(/,/, $_[0]);
+	foreach $i (@keys) {
+		$keys{$i}++;
+	};
+	return %keys;
+}
+
+sub toregexp {
+	local ($regexp) = @_;
+
+	$regexp =~ s/,/|/g;
+	$regexp = "^($regexp)\$";
+	return $regexp;
+}

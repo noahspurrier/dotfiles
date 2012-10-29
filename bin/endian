@@ -1,0 +1,100 @@
+#!/bin/sh
+######################################################################
+#
+# Determine which endian the processor uses to store numbers.
+#
+# SYNOPSIS
+#
+#	endian
+#	endian big
+#	endian little
+#
+# DESCRIPTION
+#
+#	This script attempts to determine the endianness of the processor it is
+#	running under. http://en.wikipedia.org/wiki/Endianness
+#
+#	This script may be run in two modes. In the first mode you simply call
+#	"endian" with no options and it will print a string "little" or "big"
+#	depending on what endianness was found. In the second mode you pass an
+#	option of either "big" or "little" and the script will exit 0 if the
+#	endianness matches or will exit 1 if the endianness does not match.
+#
+# EXAMPLES
+#
+#	$ endian
+#	little
+#
+#	$ if [ "$(endian)" = "little" ]; then echo "Running on a little endian system."; fi
+#	Running on a little endian system.
+#
+#	$ if endian little; then echo "Running on a little endian system."; fi
+#	Running on a little endian system.
+#
+# EXIT STATUS
+#
+#	This script exits with status 0 if the endianness matches the argument,
+#	or it exits with 1 if the endianness does not match.
+#
+# AUTHOR
+#
+#	Noah Spurrier <noah@noah.org>
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible.
+#     This license identical to the ISC License and is registered with and
+#     approved by the Open Source Initiative. For more information vist:
+#         http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c) 2011, Noah Spurrier
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# VERSION
+#
+#     Version 1
+#
+######################################################################
+
+LAST_DIGIT_OCT_INT="$(echo -n pq | hexdump | head -n 1 | sed -e "s/^.*\([0-9a-fA-F]\)[ \t\n]*$/\1/")"
+if [ "${LAST_DIGIT_OCT_INT}" = "0" ]; then
+	ENDIAN_LITTLE=1
+	ENDIAN_BIG=0
+elif [ "${LAST_DIGIT_OCT_INT}" = "1" ]; then
+	ENDIAN_LITTLE=0
+	ENDIAN_BIG=1
+else
+	echo "ERROR: Did not get last digit of hex integer." 1>&2
+	exit 1
+fi
+
+if [ "$1" = "little" ]; then
+	exit ${ENDIAN_BIG}
+fi
+
+if [ "$1" = "big" ]; then
+	exit ${ENDIAN_LITTLE}
+fi
+
+if [ $ENDIAN_LITTLE -eq 1 ]; then
+	echo "little"
+fi
+if [ $ENDIAN_BIG -eq 1 ]; then
+	echo "big"
+fi
+
+#####################################################################
+# END
+#########1#########2#########3#########4#########5#########6#########7
+# vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'

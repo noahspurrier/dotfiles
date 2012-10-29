@@ -1,0 +1,9 @@
+#!/bin/sh
+
+#
+# This draws a circle.
+#
+
+tput clear;(seq 1 0.4 57|awk '{x=int(11+10*cos($1/9));y=int(22+20*sin($1/9));system("tput cup "x" "y";echo X")}');tput cup 8 15;echo X;tput cup 8 28;echo X;(seq 16 0.4 21.6|awk '{x=int(11+6*cos($1/3));y=int(22+12*sin($1/3));system("tput cup "x" "y";echo X")}');tput cup 22 0
+
+# vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'

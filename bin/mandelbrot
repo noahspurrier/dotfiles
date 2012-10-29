@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Based on Charles Cooke's 16-color Mandelbrot
+# http://earth.gkhs.net/ccooke/shell.html
+#    for((P=10**8,Q=P/100,X=320*Q/(`tput cols`-1),Y=210*Q/`tput lines`,
+#    y=-105*Q,v=-220*Q,x=v;y<105*Q;x=v,y+=Y));do for((;x<P;a=b=i=k=c=0,
+#    x+=X));do for((;a*a+b*b<4*P*P&&i++<99;a=((c=a)*a-b*b)/P+x,b=2*c*b/P+y));
+#    do :;done;(((j=(i<99?i%16:0)+30)>37?k=1,j-=8:0));echo -ne "\E[$k;$j"mE;
+#    done;echo -e \\E[0m;done # Charles Cooke
+
+trap 'tput sgr0; echo' EXIT
+((cols=$(tput cols)-1, lines=$(tput lines)-1))
+outside=99
+for ((P=10**8,Q=P/100,X=320*Q/cols,Y=210*Q/lines,y=-105*Q,v=-220*Q,x=v; y<105*Q; x=v,y+=Y)); do
+	for (( ; x<P; a=b=i=c=0,x+=X)); do
+		for (( ; a**2+b**2<4*P**2&&i++<${outside}; a=((c=a)**2-b**2)/P+x,b=2*c*b/P+y)); do :; done
+		gray=$((232+(i<${outside}?i*24/${outside}:0)))
+		echo -en "\033[48;5;${gray}m \033[0m"
+	done
+	echo
+done
+
+#########1#########2#########3#########4#########5#########6#########7
+# vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'

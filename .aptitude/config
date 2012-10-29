@@ -1,0 +1,11 @@
+aptitude "";
+aptitude::UI "";
+aptitude::UI::Flat-View-As-First-View "true";
+aptitude::UI::Prompt-On-Exit "false";
+aptitude::UI::Minibuf-Download-Bar "true";
+aptitude::UI::InfoAreaTabs "true";
+aptitude::UI::Advance-On-Action "true";
+aptitude::Auto-Fix-Broken "false";
+aptitude::Forget-New-On-Update "true";
+Apt "";
+Apt::Install-Recommends "false";

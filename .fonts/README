@@ -1,0 +1,23 @@
+
+== TODO ==
+
+Need to make fonts for NoahClear to support bold, medium, etc.
+
+    -FontForge-NoahClear-bold-R-*-*-11-80-100-100-M-70-win-0
+    -FontForge-NoahClear-medium-R-*-*-11-80-100-100-M-140-ISO10646-1
+    -FontForge-NoahClear-bold-R-*-*-11-80-100-100-M-140-ISO10646-1
+    -FontForge-NoahClear-bold-R-*-*-11-80-100-100-M-70-win-0
+    -FontForge-NoahClear-medium-R-*-*-11-80-100-100-M-140-ISO10646-1
+    -FontForge-NoahClear-bold-R-*-*-11-80-100-100-M-140-ISO10646-1
+
+== Notes on working with X11 fonts ==
+
+print X font path:
+    xset q
+Rebuild font.dir file
+    mkfontdir ~/.fonts
+Add to font path
+    xset fp+ ~/.fonts
+Tell X to reread fonts
+    xset fp rehash
+

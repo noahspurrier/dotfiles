@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# This prints the given field.
+# For example, to filter field 3:
+#     cat textfile | field 3
+FIELD=$1
+awk '{print $'$FIELD'}'

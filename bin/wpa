@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# This is a very simple demo of wpa_supplicant for WPA2 security.
+# This creates a wpa_supplicant.conf file and starts the
+# wpa_supplicant daemon to serve it. This is intended to be a quick
+# and dirty tool. This script will find and kill any running instances
+# of NetworkManager, dhclient, and wpa_supplicant. There may be other
+# running daemons and agents that could interfere with this script.
+#
+# Copyright (c) 2010, Noah Spurrier <noah@noah.org>
+# You may use this under the "ISC License":
+#   http://opensource.org/licenses/isc-license.txt
+#
+
+TARGET_SSID=$1
+PASSWORD=$2
+IWFACE=$3
+
+# Check if user is permitted to use this script.
+NETDEV_GROUP_ID=$(grep -i netdev /etc/group | cut -d: -f 3 )
+if (id -u | grep -q 0) || (id -G | grep -q ${NETDEV_GROUP_ID}); then
+    echo "You must be root or in the 'netdev' group to use this."
+    exit 1
+fi
+
+if [ $# -lt 3 ]; then
+    echo "$0 [target_SSID] [password] [interface]"
+    exit 1
+fi
+
+killall -s INT wpa_supplicant
+sleep 1
+if killall -s INT wpa_supplicant ; then
+    echo "Cannot kill wpa_supplicant."
+    echo "Try starting with `sudo`."
+    echo "Try `etc/init.d/NetworkManager stop`"
+fi
+
+ifconfig ${IWFACE} down
+sleep 2
+(echo "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev"; \
+    wpa_passphrase "${TARGET_SSID}" "${PASSWORD}" | \
+    grep -v \#psk | sed '/ssid/a \\tscan_ssid=1') > "wpa_${TARGET_SSID}.conf"
+
+sleep 2
+chmod 600 "wpa_${TARGET_SSID}.conf"
+ifconfig ${IWFACE} up
+sleep 2
+ifconfig ${IWFACE} up
+wpa_supplicant -B -D wext -c "wpa_${TARGET_SSID}.conf" -i ${IWFACE} -f /var/log/wpa_supplicant.log
+sleep 2
+dhclient ${IWFACE}
+
+#
+# License:
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'

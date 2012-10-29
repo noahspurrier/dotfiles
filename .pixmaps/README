@@ -1,0 +1,27 @@
+== XPM graphics
+
+XPM icons work under all X Window desktops (Gnome, KDE, XFCE5).
+The best part is that they are plain text files that you can edit with Vim.
+
+== Create an SSH launcher in Gnome
+
+    1. Right-click on one of the Panels.
+
+    2. Select "+ Add to Panel...".
+
+    3. Select "Custom Application Launcher".
+
+    4. Click +Add.
+
+    5. "Create Launcher" dialog will open.
+
+    6.      Type:  Application
+            Name:  xterm
+         Command:  xterm -e ssh -Y noah@www.noah.org
+         Comment:  open ssh terminal to WWW.NOAH.ORG
+
+    7. Click on the "spring board" icon to change it.
+
+    8. Navigate to /home/noah/.pixmaps/www.noah.org.xpm
+
+    9. Click "OK"

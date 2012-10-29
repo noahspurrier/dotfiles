@@ -1,0 +1,17 @@
+= sudo =
+# This turns off passwords for sudo. This is less secure!
+# Add these lines to the END of sudoers using `visudo`.
+# The first one is a groupname, the second one is a username.
+%admin ALL=(ALL) NOPASSWD: ALL
+noah ALL=(ALL) NOPASSWD: ALL
+= /etc/network/interfaces =
+# The primary network interface
+# auto eth0
+# iface eth0 inet dhcp
+auto eth0
+iface eth0 inet static
+    address 192.168.0.100
+    netmask 255.255.255.0
+    gateway 192.168.0.1
+= notes =
+[[include:~.notes.d/]]

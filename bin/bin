@@ -1,0 +1,167 @@
+#!/usr/bin/env python
+# vim:set ft=python fileencoding=utf-8 sr et ts=4 sw=4 : See help 'modeline'
+
+"""
+SYNOPSIS
+
+    bin.py {number} [-h] [-v,--verbose] [--version]
+    {number} may be 0x[0-9a-fA-F]+, [1-9]+[0-9]*, 0[0-7]+, or 0b[0-1]+
+    The number will be reprinted in all common bases; hex, dec, oct, bin.
+
+DESCRIPTION
+
+    TODO: This describes how to use this script.
+    This docstring will be printed by the script if there is an error or
+    if the user requests help (-h or --help).
+
+EXAMPLES
+
+    TODO: The following are some examples of how to use this script.
+
+EXIT STATUS
+
+    TODO: This exits with status 0 on success and 1 otherwise.
+    This exist with a status greater than 1 if there was an
+    unexpected run-time error.
+
+AUTHOR
+
+    TODO: Name <name@example.org>
+
+LICENSE
+
+    This license is OSI and FSF approved as GPL-compatible.
+    This license identical to the ISC License and is registered with and
+    approved by the Open Source Initiative. For more information vist:
+        http://opensource.org/licenses/isc-license.txt
+
+    TODO: Copyright (c) 4-digit year, Company or Person's Name
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+VERSION
+
+    TODO: Version 1
+"""
+
+import sys
+import os
+import re
+import binascii
+import base64
+import string
+import traceback
+import optparse
+import time
+
+try:
+    if bin (0): pass
+except NameError, ne:
+    def bin(x):
+        if x < 0:
+            return '-' + bin(-x)
+        out = []
+        if x == 0:
+            out.append('0')
+        while x > 0:
+            out.append('01'[x & 1])
+            x >>= 1
+        try:
+            return '0b' + ''.join(reversed(out))
+        except NameError, ne2:
+            out.reverse()
+            return '0b' + ''.join(out)
+
+def int_of_bin_str (b):
+    """This takes a binary string and returns the integer value."""
+    if b[0:2] == '0b': b = b[2:]
+    return sum(map(lambda z: int(b[z]) and 2**(len(b) - z - 1),
+                   range(len(b)-1, -1, -1)))
+
+def main ():
+
+    global options, args
+
+    arg_hex  = re.compile ('0x[0-9a-fA-F]+')
+    arg_dec  = re.compile ('^0$|^[1-9]+[0-9]*$')
+    arg_oct  = re.compile ('0[0-7]+')
+    arg_oct2 = re.compile ('0o[0-7]+')
+    arg_bin  = re.compile ('0b[0-1]+')
+
+    if arg_hex.match(args[0]) is not None:
+        number = int (args[0], 16)
+    elif arg_dec.search(args[0]) is not None:
+        number = int (args[0], 10)
+    elif arg_oct.match(args[0]) is not None or \
+            arg_oct2.match(args[0]) is not None:
+        number = int (args[0], 8)
+    elif arg_bin.match(args[0]) is not None:
+        number = int_of_bin_str(args[0])
+    else:
+        if len(args[0]) == 1: # assume a single ASCII character to convert.
+            number = ord(args[0][0])
+        else:
+            try:
+                # Is it ASCII encoded in hex?
+                s = binascii.a2b_hex(args[0])
+                print '  STR: %s' % s
+                return 0
+            except:
+                try:
+                    # Is it data encoded in base64?
+                    s = base64.decodestring(args[0])
+                    print '  STR: %s' % s
+                    return 0
+                except:
+                    raise Exception ("cannot parse string")
+
+    print '  HEX: 0x%X' % number
+    print '  DEC: %d' % number
+    print '  OCT: 0%o' % number
+    print '  BIN: %s' % bin(number)
+    if number in range(256) and chr(number) in string.printable:
+        print 'ASCII: %s' % chr(number)
+
+if __name__ == '__main__':
+    try:
+        parser = optparse.OptionParser(
+                formatter=optparse.TitledHelpFormatter(),
+                usage=globals()['__doc__'],
+                version='1')
+        parser.add_option ('-x', '--outhex', action='store_true',
+                default=False, help='output hexidecimal')
+        parser.add_option ('-d', '--outdec', action='store_true',
+                default=False, help='output decimal')
+        parser.add_option ('-o', '--outoct', action='store_true',
+                default=False, help='output octal')
+        parser.add_option ('-b', '--outbin', action='store_true',
+                default=False, help='output binary')
+        parser.add_option ('-v', '--verbose', action='store_true',
+                default=False, help='verbose output')
+        (options, args) = parser.parse_args()
+        #if len(args) < 1:
+        #    parser.error ('missing argument')
+        exit_code = main()
+        if exit_code is None:
+            exit_code = 0
+        sys.exit(exit_code)
+    except KeyboardInterrupt, e: # The user pressed Ctrl-C.
+        raise e
+    except SystemExit, e: # The script called sys.exit() somewhere.
+        raise e
+    except Exception, e:
+        print ('ERROR: Unexpected Exception')
+        print (str(e))
+        traceback.print_exc()
+        os._exit(2)
+

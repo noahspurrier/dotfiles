@@ -1,0 +1,174 @@
+# ~/.muttrc or ~/.mutt/muttrc
+# This is a generic muttrc file.
+# This is designed to not have any account specific information in it,
+# so all my accounts can share the same base muttrc. For local overrides
+# I put them in ~/.mutt/muttrc_local which is sourced at the end of this file.
+# I usually put the following lines in my muttrc_local file:
+#set use_from=yes
+#set from="User Name <username@example.com>"
+#set hostname="example.com"
+#
+# These are examples for setting up a connection to IMAP.
+# I put these in ~/.mutt/muttrc_local file.
+#
+# Basic IMAP:
+#set spoolfile="imap://username@example.com@imap.example.com/INBOX"
+#
+# Or if using a preconnect SSH tunnel use this:
+#set preconnect="ssh -f -N -q -L 1143:localhost:143 username@imap.example.com"
+#set spoolfile="imap://username@example.com@localhost:1143/INBOX"
+#set imap_pass="not_the_best_password"
+
+# SSL certs for IMAP are stored here.
+set certificate_file="~/.mutt/known_hosts"
+# set this if using Maildir format for local mail, but don't set this if using IMAP.
+#set mbox_type=maildir
+
+# If you have a .signature file then use the following for 'editor'.
+# This assumes that 'sig_dashes' is yes (the default) for the purpose
+# of setting the location of the cursor when Mutt starts Vim.
+set editor="vim +':set textwidth=70' +':set wrap' +':set spell' +\`awk '/^-- $/ {print i; exit} {i++}' %s\` %s" 
+# If you don't have a .signature file then use the following 'editor'.
+#set editor="vim +':set textwidth=70' +':set wrap' +':set spell' +\`awk '/^$/ {print i+2; exit} {i++}' %s\` %s" 
+
+set mime_forward_decode=no
+# see all mail headers in editor
+set edit_headers=yes
+# don't ask for To: and Subject: before switching to editor
+set autoedit=yes
+set sendmail_wait=10
+# don't ask about purging deleted messages when quiting Mutt
+set delete=yes
+# this prevents Mutt from endlessly asking when you quit:
+#     "Move read messages to ~/mbox? ([no]/yes):"
+set move=no
+# sort order in index view
+set sort=mailbox-order
+# sort order in file browser
+set sort_browser=reverse-date
+# this prevents Mutt from endlessly asking:
+#     "~/Mail does not exist. Create it? ([yes]/no):"
+# override this in mutrc_local if using IMAP. For example:
+# set folder=imap://user@example.org@localhost/INBOX
+set folder=/dev/null
+# where to look for the header cache database
+set header_cache="~/.mutt/headercache"
+# for smooth scrolling
+set menu_scroll=yes
+# turn off asking to press a key after doing pipes
+# set wait_key=no
+
+ignore *
+unignore Date: From: To: Cc: Subject: #Only these are shown in the header
+hdr_order Date From To Cc Subject
+
+#
+# Color definitions
+#
+#color normal white default
+color hdrdefault red default
+color quoted brightblue default
+color signature red default
+color indicator brightyellow red
+color error brightred default
+color status yellow blue
+color tree magenta default  # the thread tree in the index menu
+color tilde magenta default
+color message brightcyan default
+color markers brightcyan default
+color attachment brightmagenta default
+color search default green  # how to hilite search patterns in the pager
+color body magenta default "(ftp|http|https)://[^ ]+"   # point out URLs
+color body magenta default [-a-z_0-9.]+@[-a-z_0-9.]+    # e-mail addresses
+color underline brightgreen default
+color header red black "^Date:"
+color header red black "^From:"
+color header red black "^To:"
+color header red black "^Cc:"
+color header red black "^Subject:"
+
+set hidden_host=yes
+
+# Use both Mutt aliases and Abook.
+set alias_file=~/.mutt/aliases
+source ~/.mutt/aliases
+set query_command="abook --mutt-query '%s'"
+macro index,pager A "<pipe-message>abook --add-email-quiet<return>"
+
+# display the alias name if email address is found in aliases
+set reverse_alias=yes
+# save copies of outgoing mail
+set copy
+# use iso8601 dates
+set date_format="!%Y-%m-%d %R%Z" 
+# go directly to edit away when replying
+set fast_reply 
+set forward_format="Fwd: %s"
+set history=100
+# include original message when replying
+set include 
+set index_format="%4C %Z %{%b %d} %-15.15L (%4c) %s"
+# check for new mail every 30 seconds
+set mail_check=30
+# mark new unread messages as old when leaving Mutt
+set mark_old
+# don't mangle wrapped lines (long URIs can be cut and pasted)
+set nomarkers 
+# don't move to the next message on next-page
+set pager_stop 
+# use format=flowed for text/plain emails
+set text_flowed
+
+# make Mutt's key bindings closer to Vim's
+bind generic \Cu        half-up
+bind generic \Cd        half-down
+bind pager   \Cu        half-up
+bind pager   \Cd        half-down
+bind pager   b          half-up
+bind pager   <Space>    half-down
+bind index   \Cu        half-up
+bind index   \Cd        half-down
+bind generic G          last-entry
+bind pager   G          bottom
+bind index   G          last-entry
+bind index   g          reply
+bind pager   g          reply
+bind index   <Delete>   delete-message
+bind index   j          next-entry
+bind index   k          previous-entry
+bind index   <Down>     next-entry
+bind index   <Up>       previous-entry
+bind generic <Space>    half-down
+bind pager   <Space>    half-down
+bind index   <Space>    half-down
+bind index   <Left>     edit
+bind index   <Right>    display-message
+bind pager   <Left>     exit
+bind pager   <Up>       previous-line
+bind pager   <Down>     next-line
+bind pager   <Right>    view-attachments
+bind attach  <Left>     exit
+bind generic <Home>     first-entry
+bind generic <End>      last-entry
+bind pager   <Home>     top
+bind pager   <End>      bottom
+
+# imitate the old search-body function
+macro index \eb '/~b ' 'search in message bodies'
+
+# simulate the old url menu
+macro index \cb |urlview\n 'call urlview to extract URLs out of a message'
+macro pager \cb |urlview\n 'call urlview to extract URLs out of a message'
+
+# Show documentation when pressing F1
+macro generic <f1> "!less /usr/share/doc/mutt-1.4.1/manual.txt\n" "Show Mutt documentation"
+macro index   <f1> "!less /usr/share/doc/mutt-1.4.1/manual.txt\n" "Show Mutt documentation"
+macro pager   <f1> "!less /usr/share/doc/mutt-1.4.1/manual.txt\n" "Show Mutt documentation"
+
+push <show-version>
+# always put the cursor at the last message when Mutt starts
+folder-hook . 'exec last-entry' 
+
+# personal settings go here -- I put my IMAP account settings here.
+source ~/.mutt/muttrc_local
+macro attach S <save-entry><bol>~/a/<enter><shell-escape>chmod\ -R\ 666\ ~/a/.<enter>

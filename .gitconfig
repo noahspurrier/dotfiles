@@ -1,0 +1,93 @@
+### [include]
+###     # This requires a version of git >= 1.7.10.
+###     # See https://github.com/gitster/git/commit/9b25a0b52e09400719366f0a33d0d0da98bbf7b0
+###     path = ~/.gitconfig.local
+
+### # Instead of this, set environment variables
+### # GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+### # I set these in my .bashrc.local file.
+### [user]
+###     name = Noah Spurrier
+###     email = noah@noah.org
+
+[alias]
+    # See also https://git.wiki.kernel.org/index.php/Aliases
+    retrack = "!retrack() { git config \"branch.$1.remote\" $(dirname \"$2\"); git config \"branch.$1.merge\" \"refs/heads/$(basename \"$2\")\"; }; retrack"
+###     graph = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+    graph = log --graph --pretty='format:%h,%ci,%d, %s <%ae>'
+    ll = log --name-status
+
+###     # thanks to zach wily, this is for pushing reviews to gerrit
+###     push-change = "!bash -c ' \
+###         local_ref=$(git symbolic-ref HEAD); \
+###         local_name=${local_ref##refs/heads/}; \
+###         remote=$(git config branch.\"$local_name\".remote || echo origin); \
+###         remote_ref=$(git config branch.\"$local_name\".merge); \
+###         remote_name=${remote_ref##refs/heads/}; \
+###         remote_review_ref=\"refs/for/$remote_name\"; \
+###         r=\"\"; \
+###         if [[ $0 != \"\" && $0 != \"bash\" ]]; then r=\"--reviewer=$0\"; fi; \
+###         if [[ $1 != \"\" ]]; then r=\"$r --reviewer=$1\"; fi; \
+###         if [[ $2 != \"\" ]]; then r=\"$r --reviewer=$2\"; fi; \
+###         if [[ $3 != \"\" ]]; then r=\"$r --reviewer=$3\"; fi; \
+###         if [[ $4 != \"\" ]]; then r=\"$r --reviewer=$4\"; fi; \
+###         git push --receive-pack=\"gerrit receive-pack $r\" $remote HEAD:$remote_review_ref'"
+###
+###     # thanks to cody cutrer
+###     cherry-pick-merge = "!bash -c 'git cherry-pick -n -m 1 $0 && \
+###         git log -1 --pretty=%P $0 | cut -b 42- > .git/MERGE_HEAD && \
+###         git commit -v'"
+###
+###     # other useful things
+###     remote-ref = "!bash -c ' \
+###         local_ref=$(git symbolic-ref HEAD); \
+###         local_name=${local_ref##refs/heads/}; \
+###         remote=$(git config branch.\"#local_name\".remote || echo origin); \
+###         remote_ref=$(git config branch.\"$local_name\".merge); \
+###         remote_name=${remote_ref##refs/heads/}; \
+###         echo remotes/$remote/$remote_name'"
+###     rebase-recent = !git rebase -i $(git remote-ref)
+
+[core]
+    pager = less -FRSX
+    editor = vim
+#        whitespace=fix,-indent-with-non-tab,trailing-space,cr-at-eol
+
+[color]
+    diff = auto
+    status = auto
+    branch = auto
+    grep = auto
+    showbranch = auto
+    interactive = auto
+    decorate = auto
+    ui = auto
+
+[color "branch"]
+    current = yellow reverse
+    local = yellow
+    remote = green
+
+[color "diff"]
+    meta = yellow bold
+    frag = magenta bold
+    old = red bold
+    new = green bold
+    whitespace = yellow reverse
+
+[color "status"]
+    header = green
+    added = yellow reverse
+    changed = yellow
+    branch = blue
+    untracked = red bold
+
+[branch]
+    # This sets pull to default to `git pull --rebase`.
+    autosetuprebase = always
+
+[push]
+# The following only works on newer versions of git.
+# It's similar to setting the default to upstream.
+#    default = simple
+    default = upstream

@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# This extracts the given archive. It detects gzip, bzip2, zip, tar, etc.
+#
+# TODO This should attempt to detect exploding archives.
+# These are archives that don't specify a subdirectory, so when
+# they are extracted they spew files all over the current directory.
+#
+#     tar tzf tarball.tar.gz | awk -F '/' '{print $1}' | uniq | wc -l
+#
+# A well behaved archive should only create one directory or
+# one file in the current directory.
+#
+# Noah Spurrier 2010-04-16 23:35:46-07:00
+
+OPT='xf'
+for FILENAME in "$@"; do
+	case "${FILENAME}" in
+	*.tgz)     gunzip -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tar.gz)  gunzip -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tbz2)    bunzip2 -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tar.bz2) bunzip2 -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tZ)      uncompress -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tar.Z)   uncompress -c "${FILENAME}" | tar ${OPT} - ;;
+	*.gz)      gunzip "${FILENAME}" ;;
+	*.bz2)     bunzip2 "${FILENAME}" ;;
+	*.Z)       uncompress "${FILENAME}" ;;
+	*.tar)     tar ${OPT} ${FILENAME} ;;
+	*.zip)     unzip -lv "${FILENAME}"
+		echo "Unzip this manually with 'unzip ${FILENAME}'"
+	;;
+	*.7z)      7z x "${FILENAME}" ;;
+	*.rar)
+		if which unrar >/dev/null; then
+			unrar x "${FILENAME}"
+		else
+			unrar-free -x "${FILENAME}"
+		fi
+	;;
+	*)      echo "ERROR: Filename, ${FILENAME} was not found" >&2
+		exit 1
+	;;
+	esac
+done
+
+exit 0

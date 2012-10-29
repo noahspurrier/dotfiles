@@ -1,0 +1,123 @@
+#!/bin/sh
+#
+# This takes individual PNG or JPG image frames and creates a video out of them.
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible.
+#     This license identical to the ISC License and is registered with and
+#     approved by the Open Source Initiative. For more information vist:
+#         http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c) 2012, Noah Spurrier
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# AUTHOR
+#
+#     Noah Spurrier <noah@noah.org>
+#
+
+VIDEO_FILENAME="video.mov"
+
+print_help () {
+	echo "video-join [-h] [-o <output_filename>] [output_filename]"
+	echo
+	echo "This takes all the .png or .jpg files in the current directory"
+	echo "and joins them into a h.264 video file."
+	echo "You may optionally specify an output filename."
+	echo "If a filename is not given then ${VIDEO_FILENAME} will be used."
+	echo
+	echo "OPTIONS"
+	echo "    -h"
+	echo "        Prints this help."
+	echo "    -o <output_filename>"
+	echo "        Outputs to the given filename."
+	echo "    [output_filename]"
+	echo "        This is equivalent to using the -o option."
+}
+
+files_exist () {
+        for i in $*; do
+                [ -e "$i" ] && return 0
+        done
+        return 1
+}
+
+#VIDEO_FILENAME="video.mov"
+#while (( "$#" )); do
+#	if [ "-h" = "${1}" ]; then
+#		print_help
+#		exit 0
+#	elif [ "--help" = "${1}" ]; then
+#		print_help
+#		exit 0
+#	else
+#		VIDEO_FILENAME=${1}
+#		shift
+#	fi
+#done
+
+VIDEO_FILENAME="video.mov"
+
+while getopts ":ho:" opt; do
+	case $opt in
+		h)
+			print_help
+			exit 0
+			;;
+		o)
+			VIDEO_FILENAME=$OPTARG
+			;;
+		\?)
+			echo "Invalid option: -$OPTARG" >&2
+			print_help
+			exit 1
+			;;
+		:)
+			echo "Option -$OPTARG requires an argument" >&2
+			print_help
+			exit_1
+			;;
+	esac
+done
+shift $(($OPTIND - 1))
+# Check positional arguments.
+if [ $# -ne 0 ]; then
+	VIDEO_FILENAME=$1
+fi
+
+if [ -f "${VIDEO_FILENAME}" ]; then
+	echo "The output video file already exists."
+	echo "filename: ${VIDEO_FILENAME}"
+	exit 1
+fi
+
+if files_exist *.png && files_exist *.jpg; then
+	echo "This directory has mixed PNG and JPG files."
+	echo "There must be only one type for this script to run."
+	exit 1
+fi
+
+if files_exist *.png; then
+	mencoder mf://*.png -mf type=png:fps=30 -ovc x264 -x264encopts preset=slow:tune=film:fast_pskip=0:threads=auto:crf=20 -o ${VIDEO_FILENAME}
+# Two pass encoding
+#        mencoder "mf://*.png" -mf fps=30 -o ${VIDEO_FILENAME} -ovc lavc -lavcopts vcodec=mpeg4:${LAVCOPTS}:vpass=1
+#        mencoder "mf://*.png" -mf fps=30 -o ${VIDEO_FILENAME} -ovc lavc -lavcopts vcodec=mpeg4:${LAVCOPTS}:vpass=2
+elif files_exist *.jpg; then
+	mencoder mf://*.jpg -mf type=jpeg:fps=30 -ovc x264 -x264encopts preset=slow:tune=film:fast_pskip=0:threads=auto:crf=20 -o ${VIDEO_FILENAME}
+else
+        echo "There are no .png or .jpg files in the current directory."
+        exit 1
+fi
+

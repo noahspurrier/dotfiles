@@ -1,0 +1,17 @@
+#!/bin/sh
+
+SERVER=$1
+(echo 'GET /dotfiles HTTP/1.1';echo 'Host: www.noah.org';echo;echo;sleep 1) | telnet www.noah.org 80 2>/dev/null | sed '1,/^$/ d'
+
+###1266929857
+##(echo 'GET /dotfiles HTTP/1.1';echo 'Host: www.noah.org';echo;echo) | nc www.noah.org 80
+###1266929982
+##(echo 'GET /dotfiles HTTP/1.1';echo 'Host: www.noah.org';echo;echo) | nc www.noah.org 80 | sed '1,/^$/ d'
+###1266929996
+##(echo 'GET /dotfiles HTTP/1.1';echo 'Host: www.noah.org';echo;echo) | nc www.noah.org 80
+###1266930028
+##(echo 'GET /dotfiles HTTP/1.1';echo 'Host: www.noah.org';echo;echo) | nc www.noah.org 80 | sed '1,/^[ ]*$/ d'
+###1266930052
+##(echo 'GET /dotfiles HTTP/1.0';echo 'Host: www.noah.org';echo;echo;sleep 1) | telnet www.noah.org 80 | sed '1,/^$/ d'
+###1266930071
+##(echo 'GET /dotfiles HTTP/1.0';echo 'Host: www.noah.org';echo;echo;sleep 1) | telnet www.noah.org 80 2>/dev/null | sed '1,/^$/ d'

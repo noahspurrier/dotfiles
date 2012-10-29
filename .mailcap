@@ -1,0 +1,11 @@
+# This config file specifies external commands to use for handling specified
+# MIME types. This is used in MIME-aware applications such as mail readers and
+# web browsers. See Mutt rc config files.
+
+#image/*;xv %s; test=RunningX
+text/html; lynx -force_html -dump %s ; copiousoutput
+application/pdf; pdftotext -nopgbrk %s ; copiousoutput
+application/x-gzip; vim %s
+
+application/msword; ooffice %s; test=test -n "$DISPLAY"
+application/msword; antiword -f -s -i 1 -m 8859-1 %s | fmt -ut --width=78; copiousoutput

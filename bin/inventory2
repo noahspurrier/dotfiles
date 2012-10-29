@@ -1,0 +1,290 @@
+#!/bin/bash
+
+PWD=$(pwd)
+START_DIRECTORY=${PWD}
+if [ -x $0 ]; then
+        COMMAND=$(readlink -f "$0")
+else
+        COMMAND=$(readlink -f "${PWD}/$0")
+fi
+INSTALLDIR=$(dirname ${COMMAND})
+
+DEVICE=$(ip -o link show | grep -o -E "eth[[:digit:]]+")
+## Here is an alternate way to get the MAC -- not sure which I prefer:
+## DEVICE_MAC=$(ip link show ${DEVICE} | sed -n 's/.*ether \([0-9a-fA-F:]\+\) .*/\1/p')
+## DEVICE_MAC=$(ip -o link show ${DEVICE} | grep -o -E "[[:xdigit:]]{2}:[[:xdigit:]]{2}:[[:xdigit:]]{2}:[[:xdigit:]]{2}:[[:xdigit:]]{2}:[[:xdigit:]]{2}" | grep -v -E "00:00:00:00:00:00" |  grep -v -E "ff:ff:ff:ff:ff:ff")
+DEVICE_MAC=$(cat /sys/class/net/eth0/address)
+
+############################################################
+## Functions
+############################################################
+
+# Setup colors if running on a tty.
+if type tput >/dev/null 2>/dev/null && tty <&1 >/dev/null 2>&1; then
+        COLOR_RED="$(tput setaf 1)"
+        COLOR_GRN="$(tput setaf 2)"
+        COLOR_GREEN="$(tput setaf 2)"
+        COLOR_BLU="$(tput setaf 4)"
+        COLOR_BLUE="$(tput setaf 4)"
+        COLOR_YEL="$(tput setaf 3)"
+        COLOR_YELLOW="$(tput setaf 3)"
+        COLOR_OFF="$(tput sgr0)"
+else
+        COLOR_RED=""
+        COLOR_GRN=""
+        COLOR_BLU=""
+        COLOR_YEL=""
+        COLOR_OFF=""
+fi
+
+print_header ()
+{
+        message=$1
+	echo
+        echo ${COLOR_YEL}
+        echo "= ${message} ="
+        echo "----"
+        echo "DATE: $(date '+%F %T%:::z (%A %B)')"
+        echo "ETH:" ${DEVICE}
+        echo "MAC:" ${DEVICE_MAC}
+        echo "PWD:" ${PWD}
+        echo "COMMAND:" ${COMMAND}
+        echo "INSTALLDIR:" ${INSTALLDIR}
+        echo "----"
+        echo ${COLOR_OFF}
+	echo
+}
+
+print_section ()
+{
+        message=$1
+        echo ${COLOR_BLU}
+        echo -e "\f== ${message} =="
+        echo ${COLOR_OFF}
+	echo
+}
+
+print_footer ()
+{
+        echo ${COLOR_YEL}
+        echo -e "\f== EOF =="
+	echo "DATE: $(date '+%F %T%:::z (%A %B)')"
+        echo "----"
+        echo ${COLOR_OFF}
+	echo
+}
+
+############################################################
+## MAIN
+############################################################
+print_header "Inventory and Overview"
+
+########################################
+print_section "network interfaces"
+
+# Hack to ralink driver. It does not report MAC address
+# until the interface is actually up.
+ifconfig ra0 up 2>/dev/null >/dev/null
+
+(echo "INTERFACE OPERSTATE MAC_ADDRESS CARRIER"
+for iface in $(find /sys/class/net -not -type d); do
+	echo ${iface##*/} $(cat ${iface}/operstate) $(cat ${iface}/address) $(cat ${iface}/carrier)
+done) | column -t -n
+
+########################################
+print_section "/etc/issue.net"
+cat /etc/issue.net
+
+########################################
+print_section "kernel version"
+cat /proc/version 2>/dev/null || uname -a
+
+########################################
+print_section "/proc/cmdline"
+cat /proc/cmdline
+
+########################################
+print_section "java version"
+java -version 2>&1
+
+########################################
+print_section "USB devices"
+lsusb
+
+########################################
+print_section "benchmark SSL speed on AES encryption"
+openssl speed aes-256-cbc 2>&1
+
+########################################
+print_section "benchmark drive speed"
+cd /tmp
+rm test_data.bin >/dev/null 2>&1
+sync
+dd if=/dev/zero of=test_data.bin oflag=dsync conv=fdatasync  bs=8388608 count=16 2>&1 | grep "copied" | cut -f1,6 -d" " | awk '{printf ("write-speed: %7.2f MB/s\n", $1 / $2 / (1024*1024))}'
+sync
+if dd if=test_data.bin iflag=direct conv=fdatasync of=/dev/null bs=8388608 count=16 2>&1 | grep "copied" | cut -f1,6 -d" " | awk '{printf ("read-speed:  %7.2f MB/s\n", $1 / $2 / (1024*1024))}'; then
+	echo "dd choked on iflag=direct. Trying without this option and copying to /dev/shm/mem. This is not trustworthy."
+	dd if=/home/noah/test_data.bin conv=fdatasync of=/dev/shm/mem bs=8388608 count=16 2>&1 | grep "copied" | cut -f1,6 -d" " | awk '{printf ("read-speed:  %7.2f MB/s\n", $1 / $2 / (1024*1024))}'
+fi
+sync
+rm test_data.bin >/dev/null 2>&1
+sync
+cd ${INSTALLDIR}
+
+########################################
+print_section "benchmark memory speed - 128 MB copy"
+if [ -r /proc/kcore ]; then
+	echo "128MB from /proc/kcore to /dev/shm/mem"
+	dd if=/proc/kcore of=/dev/shm/mem bs=$((1024*1024)) count=128 2>&1 | grep "copied" | cut -f1,6 -d" " | awk '{printf ("%4.2f MB/s\n", $1 / $2 / (1024*1024))}'
+elif [ -r /dev/mem ]; then
+	echo "128MB from /dev/mem to /dev/shm/mem"
+	dd if=/dev/mem of=/dev/shm/mem bs=$((1024*1024)) count=128 2>&1 | grep "copied" | cut -f1,6 -d" " | awk '{printf ("%4.2f MB/s\n", $1 / $2 / (1024*1024))}'
+fi
+
+########################################
+print_section "Was /proc/config.gz built in?"
+if [ -r /proc/config.gz ]; then
+	echo "Yes, calculating md5sum..."
+	md5sum /proc/config.gz
+else
+	echo "ERROR: /proc/config.gz NOT FOUND."
+fi
+
+########################################
+print_section "Missing libraries"
+IFS=:
+for BINDIR in $PATH; do
+	ldd $BINDIR/* | grep "not found" | sort -u
+done
+
+########################################
+print_section "/proc/partitions"
+echo "# Note that this may not agree with 'fdisk -l'."
+cat /proc/partitions
+
+########################################
+print_section "/proc/swaps"
+cat /proc/swaps
+
+########################################
+print_section "/proc/mounts"
+cat /proc/mounts
+
+########################################
+print_section "/proc/mtd"
+cat /proc/mtd
+
+########################################
+print_section "disk space used and available"
+POSIXLY_CORRECT=1 df --all --print-type --local
+
+########################################
+print_section "disk inodes used and available"
+POSIXLY_CORRECT=1 df --all --print-type --local --inodes
+
+########################################
+print_section "memory info"
+vmstat -s
+
+########################################
+print_section "CPU info"
+cat /proc/cpuinfo
+
+########################################
+print_section "interrupts"
+cat /proc/interrupts
+
+########################################
+print_section "iomem"
+cat /proc/iomem
+
+########################################
+print_section "pagetypeinfo"
+cat /proc/pagetypeinfo
+
+########################################
+print_section "zoneinfo"
+cat /proc/zoneinfo
+
+########################################
+print_section "buddyinfo"
+cat /proc/buddyinfo
+
+########################################
+print_section "stat"
+cat /proc/stat
+
+########################################
+print_section "arp"
+cat /proc/net/arp
+
+########################################
+print_section "route"
+cat /proc/net/route
+
+########################################
+print_section "wireless"
+cat /proc/net/wireless
+
+########################################
+print_section "dev"
+cat /proc/net/dev
+
+########################################
+print_section "/proc/tty/drivers"
+cat /proc/tty/drivers
+
+########################################
+print_section "/proc/locks"
+cat /proc/locks
+
+########################################
+print_section "wireless extensions iwconfig version"
+iwconfig --version
+
+########################################
+print_section "WPA Supplicant version"
+wpa_supplicant -v
+
+########################################
+print_section "ld library path"
+cat /etc/ld.so.conf.d/*.conf
+
+########################################
+print_section "init version"
+initctl --version
+
+########################################
+print_section "/etc/timezone"
+cat /etc/timezone
+
+########################################
+print_section "bash version"
+/bin/bash --version
+
+########################################
+print_section "e2fsck version"
+e2fsck -V 2>&1
+
+########################################
+print_section "tune2fs version"
+tune2fs 2>/dev/null
+
+########################################
+print_section "module-init-tools version"
+depmod -V
+
+########################################
+print_section "procps version"
+uptime -V
+
+########################################
+## print_section "X.org version"
+## xdpyinfo
+
+########################################
+print_footer
+
+############################################################
+## EOF
+############################################################

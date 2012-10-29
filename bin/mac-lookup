@@ -1,0 +1,113 @@
+#!/bin/sh
+
+#
+# mac-lookup
+#
+# This takes a given list of MAC addresses or a list of OUIs
+# and returns the manufacturer or owner of each OUI.
+# The list may be give as arguments or it may be piped through stdin.
+# The MAC format may be the same as the examples below.
+# Octet separators may be ':' or '-' or nothing.
+#
+#     $ echo "00:25:00:ff:ec:01 00-1a-11-ff-ff-01 002304a63f01" | mac-lookup
+#     002500     (base 16)            Apple, Inc
+#     001A11     (base 16)            Google Inc.
+#     002304     (base 16)            Cisco Systems
+#
+# This is the equivalent:
+#
+#     $ mac-lookup 00:25:00:fe:cc:78 00-1a-11-ff-ff-01 002304a63f01
+#     002500     (base 16)            Apple, Inc
+#     001A11     (base 16)            Google Inc.
+#     002304     (base 16)            Cisco Systems
+#
+# If an OUI is not found in the oui cache or if the cache does not exist then
+# this script will attempt to download a fresh copy from the IEEE. It will not
+# attempt to update the cache more than once per hour even if an OUI is not
+# found in the current cache.
+#
+# FILES
+#
+#     /var/tmp/oui.txt
+#
+# AUTHOR
+#
+#     Noah Spurrier <noah@noah.org>
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible.
+#     This license identical to the ISC License and is registered with and
+#     approved by the Open Source Initiative. For more information vist:
+#         http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c) 2010, Noah Spurrier <noah@noah.org>
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# VERSION
+#
+#     Version 1
+#
+
+if [ $# -eq 0 ]; then
+	MAC_LIST=$(cat)
+else
+	MAC_LIST=$@
+fi
+
+# Do a little clean-up of the input argument.
+# This can be improved. This is done in two steps as a way to implement
+# greedy matching. We want to match first a full 6-octet MAC address.
+# If not matched then try just a 3-octet OUI.
+TARGET_MAC=$(echo ${MAC_LIST} | grep -E --only-matching --max-count=1 -e "([[:xdigit:]]{2}){6}" -e "([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}" -e "([[:xdigit:]]{1,2}-){5}[[:xdigit:]]{1,2}" | sed -e 's/[-:]//g' -e 'y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/')
+TARGET_OUI=$( for m in ${TARGET_MAC}; do echo $m | cut -c -6; done)
+if [ -z "${TARGET_OUI}" ]; then
+	TARGET_OUI=$(echo ${MAC_LIST} | grep -E --only-matching --max-count=1 -e "([[:xdigit:]]{2}){3}" -e "([[:xdigit:]]{1,2}:){2}[[:xdigit:]]{1,2}" -e "([[:xdigit:]]{1,2}-){2}[[:xdigit:]]{1,2}" | sed -e 's/[-:]//g' -e 'y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/')
+fi
+
+#OUI_CACHE_DIR_LIST="/var/cache/ /var/tmp/ /tmp/"
+#OUI_CACHE_FILENAME="oui.txt"
+#OUI_CACHE="/var/cache/oui.txt"
+# Many applications install their own copies. We save some time by checking
+# these sources first. If they don't pan out then we search IEEE_URL.
+#LOCAL_OUI_PATHS="/etc/ntop/oui.txt /etc/arpalert/oui.txt /usr/share/btscanner/oui.txt /usr/share/arp-scan/ieee-oui.txt" # /usr/share/arpwatch/ethercodes.dat"
+
+OUI_CACHE="/var/tmp/oui.txt"
+MIN_CACHE_AGE_SECONDS=3600
+# This is the official system of record for OUI assignments.
+#IEEE_URL="http://standards.ieee.org/regauth/oui/oui.txt"
+IEEE_URL="http://standards.ieee.org/develop/regauth/oui/oui.txt"
+
+refresh_oui_cache () {
+	cache_age=$(stat -c %Y ${OUI_CACHE})
+	age=$(date "+%s" -d "-${cache_age:-0} seconds")
+	if [ ${age:-0} -lt ${MIN_CACHE_AGE_SECONDS} ]; then
+		return
+	fi
+	rm ${OUI_CACHE}
+	(umask 000; date +"# %s%n# %F %T%z" > ${OUI_CACHE})
+	# Note that I do want APPEND because the previous command
+	# initialized the file with a specific umask and a date comment.
+	curl -s ${IEEE_URL} >> ${OUI_CACHE}
+}
+
+for OUI in ${TARGET_OUI}; do
+	if ! grep ${OUI} ${OUI_CACHE}; then
+		refresh_oui_cache
+		grep ${OUI} ${OUI_CACHE}
+#		grep -A 5 ${OUI} ${OUI_CACHE}
+	fi
+done
+
+# vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'

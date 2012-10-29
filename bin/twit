@@ -1,0 +1,158 @@
+#!/usr/bin/env python
+# vim:ts=4:sw=4:expandtab:ft=python:fileencoding=utf-8
+
+"""
+SYNOPSIS
+
+    twit [-h] [-v,--verbose] [--version] [-u,--username] [-p,--password]
+        [-r,--reject_oversize] "Status message to send"
+
+DESCRIPTION
+
+    This is a simple Twitter client. It sends status messages to Twitter. It
+    can read status messages from a stdin pipe-line or as arguments on the
+    command-line. If there is both then the arguments will be appended to whatever
+    is read from stdin.
+
+    Do not update more than once a second without getting permission from
+    Twitter. Otherwise they will automatically block your updates.
+
+    The username and password can be stored in environment variables; passed on
+    the command-line; or prompted for interactively. If you store your username and
+    password in environment variables then do something like this:
+
+        export twit_username=my_username
+        export twit_password=my_password
+
+EXAMPLES
+
+    This is a simple example of how to use this script:
+
+        twit -u my_username -p my_password This is a test status message.
+
+    This will prompt you for your password:
+
+        twit -u my_username This is a test status message.
+
+    This will prompt you for both your username and your password (unless
+    set in environment variables):
+
+        twit This is a test status message.
+
+    This accepts text from a stdin pipeline. Here I echo a status message into the script:
+
+        echo "Hello test status message" | twit -u my_username -p my_password
+
+    Note that by default `twit` will silently truncate your message at 140
+    characters. If you want to use this in a situation were you would rather catch
+    and report oversized message, then you can specify the -r option. With the -r
+    option `twit` will not send the message and will return with an exit code of 1.
+    For example, this will be rejected:
+
+        twit -r -u my_username -p my_password This message is over 140
+            characters in length. It will be rejected and an exit code of 1 will be
+            returned to the caller instead of the usual 0 exit code for success.
+
+EXIT STATUS
+
+    Exits with 0 if there were no errors. Exits with 1 if the status message
+    could not be posted to Twitter.
+
+AUTHOR
+
+    Noah Spurrier <noah@noah.org>
+
+LICENSE
+
+    This script is in the public domain, free from copyrights or restrictions.
+
+VERSION
+
+    $Id: twit 261 2008-05-22 19:11:57Z noah $
+"""
+
+import sys, os, traceback, optparse, getpass, time
+import urllib, urllib2
+
+def update (username, password, status):
+
+    """This sends the status update to Twitter with the given username and
+    password. This authenticates with Basic Auth. Note: Do not update more
+    than once a second without getting permission from Twitter."""
+
+    uri = "http://twitter.com/statuses/update.json"
+    auth_handler = urllib2.HTTPBasicAuthHandler()
+    auth_handler.add_password("Twitter API", uri, username, password)
+    req = urllib2.build_opener(auth_handler)
+    opts = urllib.urlencode({"status":status, "source":"twit" })
+    try:
+        req.open(uri, opts).read()
+    except urllib2.HTTPError, e:
+        print str(e)
+        print "Could not update twitter status."
+        return 1
+    return 0
+
+def main ():
+
+    global options, args
+
+    username = None
+    password = None
+    if 'twit_username' in os.environ:
+        username = os.environ['twit_username']
+    if 'twit_password' in os.environ:
+        password = os.environ['twit_password']
+    if options.username is not None:
+        username = options.username
+    if options.password is not None:
+        password = options.password
+    if username is None:
+        username = raw_input('username: ')
+    if password is None:
+        password = getpass.getpass('password: ')
+
+    status = ''
+    if not sys.stdin.isatty(): # process stdin pipeline
+        status=sys.stdin.read()
+    status = status + ' '.join(args)
+
+    if options.reject_oversize and len(status)>140:
+        print "Rejecting oversized status message!",
+        print "Status message length:", len(status)
+        return 1
+    status = status[:140]
+    if options.verbose:
+        print "username:", username
+        print "password:", password
+        print "status:", status
+    if options.test:
+        return 0
+    return update(username, password, status)
+
+if __name__ == '__main__':
+    try:
+        start_time = time.time()
+        parser = optparse.OptionParser(formatter=optparse.TitledHelpFormatter(), usage=globals()['__doc__'], version='$Id: twit 261 2008-05-22 19:11:57Z noah $')
+        parser.add_option ('-v', '--verbose', action='store_true', default=False, help='verbose output')
+        parser.add_option ('-u', '--username', default=None, help='Your Twitter username')
+        parser.add_option ('-p', '--password', default=None, help='Your Twitter password')
+        parser.add_option ('-r', '--reject_oversize', action='store_true', default=False, help='Reject oversize status messages.')
+        parser.add_option ('-t', '--test', action='store_true', default=False, help='test mode (does not connect)')
+        (options, args) = parser.parse_args()
+        if options.verbose: print time.asctime()
+        exit_code = main()
+        if options.verbose: print time.asctime()
+        if options.verbose: print 'TOTAL TIME IN MINUTES:',
+        if options.verbose: print (time.time() - start_time) / 60.0
+        sys.exit(exit_code)
+    except KeyboardInterrupt, e: # Ctrl-C
+        raise e
+    except SystemExit, e: # sys.exit()
+        raise e
+    except Exception, e:
+        print 'ERROR, UNEXPECTED EXCEPTION'
+        print str(e)
+        traceback.print_exc()
+        os._exit(1)
+

@@ -1,0 +1,15 @@
+
+style "desktop-icon"
+{
+    NautilusIconContainer::frame_text = 1
+    text[NORMAL] = "#000000"
+    NautilusIconContainer::normal_alpha = 128
+    NautilusIconContainer::highlight_alpha = 255
+    NautilusIconContainer::dark_info_color = "#444444"
+    NautilusIconContainer::light_info_color = "#bbbbbb"
+    NautilusIconContainer::shadow-type = GTK_SHADOW_NONE
+    GtkToolbar::shadow-type = GTK_SHADOW_NONE
+    GtkMenuBar::shadow-type = GTK_SHADOW_NONE
+}
+class "GtkWidget" style "desktop-icon"
+

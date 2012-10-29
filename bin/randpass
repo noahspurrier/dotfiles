@@ -1,0 +1,154 @@
+#!/usr/bin/env python
+
+"""
+SYNOPSIS
+
+    randpass [-h, --help] [--cap] [--nato]
+
+DESCRIPTION
+
+    This generates a random password that is easy to pronounce. The passwords
+    are built up of pairs of Conssonants and Vowels. It helps to read the
+    letters in pairs. These passwords are easy to pronounce and I found that I
+    can remember them for a few minutes without trying very hard.
+
+    This is not intended to create great passwords, but "good enough"
+    passwords. Some misguided admins create passwords so complicated that
+    they guarantee that I will never remember them.
+
+    The "apg" program uses an algorithm defined in FIPS PUB 181 which claims
+    that it can generate "Approximately 18 million 6-character, 5.7 billion
+    8-character, and 1.6 trillion 10-character passwords." The "pwgen" program
+    simimlarly generates passwords. I don't find either of those password
+    generators to create very pronouncable or memorable passwords. Most
+    authentication systems limit login attempts, so I think these numbers are
+    academic. The system in this script by default yields up to 61,412,500 8
+    character passwords -- which may not be a lot if you are using this for
+    your bomber recall code, but at least it beats "POE". If the passwords are
+    not long enough for your application then use the '--num' option to create
+    a longer password. By default this script creates passwords made of three
+    pairs of letters plus two digits (8 characters total).
+
+    The formula to give the search-space size of an arbitrary length password
+    from an arbitrary length alphabet is as follows:
+        sum([ALPHABET_LENGTH**nn for nn in range(PW_LENGTH+1)])
+    So for an 8 character password using only lower-case letters, the
+    search-space size is 217180147159 characters. The argorithm in this
+    password generator does not easily fit this formula.
+
+EXAMPLES
+
+    $ randpass
+    mayomi22
+
+    $ randpass --cap
+    MoNuRi45
+
+    $ randpass --nato
+    wenogu36, "whiskey echo november oscar golf uniform three six"
+
+    $ randpass --cap --nato
+    HeSoTu95, "hotel echo sierra oscar tango uniform nine five"
+
+    $ randpass --num=6
+    hiwasitagumo67
+
+AUTHOR
+
+    Noah Spurrier <noah@noah.org>
+
+LICENSE
+
+    This license is approved by the OSI and FSF as GPL-compatible.
+        http://opensource.org/licenses/isc-license.txt
+
+    Copyright (c) 2012, Noah Spurrier
+    PERMISSION TO USE, COPY, MODIFY, AND/OR DISTRIBUTE THIS SOFTWARE FOR ANY
+    PURPOSE WITH OR WITHOUT FEE IS HEREBY GRANTED, PROVIDED THAT THE ABOVE
+    COPYRIGHT NOTICE AND THIS PERMISSION NOTICE APPEAR IN ALL COPIES.
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+VERSION
+
+    1
+"""
+
+import sys, os, traceback, optparse
+import random
+
+def nato (s):
+
+    """This translates a string into NATO phonetics.
+    """
+
+    alpha = {'a':'alpha', 'b':'bravo', 'c':'charlie', 'd':'delta',
+            'e':'echo', 'f':'foxtrot', 'g':'golf', 'h':'hotel', 'i':'india',
+            'j':'juliet', 'k':'kilo', 'l':'lima', 'm':'mike', 'n':'november',
+            'o':'oscar', 'p':'papa', 'q':'quebec', 'r':'romeo', 's':'sierra',
+            't':'tango', 'u':'uniform', 'v':'victor', 'w':'whiskey',
+            'y':'yankee', 'z':'zulu',
+            '0':'zero', '1':'one', '2':'two', '3':'three', '4':'four',
+            '5':'five', '6':'six', '7':'seven', '8':'eight', '9':'niner'}
+    s = s.lower()
+    n = ''
+    n = [n+alpha[c] for c in s if c in alpha]
+    n = ' '.join(n)
+    return n
+
+def main ():
+
+    global options, args
+
+    #C = ('th','ch','w','r','t','y','p','s','d','f','g','h','j','k','z','v','b','n','m')
+    C = ('w','r','t','y','p','s','d','f','g','h','j','k','z','v','b','n','m')
+    V = ('a','e','i','o','u')
+    ph = [(c+v) for c in C for v in V]
+    pc = len(ph)
+
+    p = []
+    for i in range(options.num):
+        if options.cap:
+            p.append (ph[random.randrange(pc)].capitalize())
+        else:
+            p.append (ph[random.randrange(pc)])
+    n3 = random.choice('0123456789')
+    n4 = random.choice('0123456789')
+    if options.verbose:
+        print "%d possible %d phoneme words" % (pow(pc,options.num),options.num)
+        print "%d possible with a two digit random number" % (pow(pc,options.num)*100)
+    pw = ''.join(p) + n3 + n4
+    if options.nato:
+        print pw + ', "' + nato(pw) + '"'
+    else:
+        print pw
+
+
+if __name__ == '__main__':
+    try:
+        parser = optparse.OptionParser(formatter=optparse.TitledHelpFormatter(), usage=globals()['__doc__'], version='1')
+        parser.add_option ('-v', '--verbose', action='store_true', default=False, help='verbose output')
+        parser.add_option ('-p', '--nato', action='store_true', default=False, help='NATO phonetic output')
+        parser.add_option ('-c', '--cap', action='store_true', default=False, help='Capitalize each phoneme')
+        parser.add_option ('-n', '--num', type='int', default=3, help='Number of phonemes')
+
+        (options, args) = parser.parse_args()
+        #if len(args) < 1:
+        #    parser.error ('missing argument')
+        main()
+        sys.exit(0)
+    except KeyboardInterrupt, e: # Ctrl-C
+        raise e
+    except SystemExit, e: # sys.exit()
+        raise e
+    except Exception, e:
+        print 'ERROR, UNEXPECTED EXCEPTION'
+        print str(e)
+        traceback.print_exc()
+        os._exit(1)
+

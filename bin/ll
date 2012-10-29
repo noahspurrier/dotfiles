@@ -1,0 +1,39 @@
+#!/bin/sh
+
+#
+# This is trivial short cut around cat and ls.
+# It's a combination cat/ls/cd command.
+# If the first argument is a file it will cat the file.
+# If the first argument is a dir it will ls the file.
+# if there is a second argument it will be treated as a command to
+# run on the first argument -- this swaps the normal order of
+# function and arguments.
+#
+# Strange? Yes, but I found that it fits my brain. When I type a long
+# path looking for a file in a directory I often change my mind and
+# decide that I actually want some other command. You could just press
+# ctrl-A and then change the function, but somehow I found my brain
+# wanting this reverse notation instead. It's kind of like RPN.
+#
+
+CAT="$(which cat)"
+LS="$(which ls) -la"
+PATH_TARGET="$1"
+if [ $# -gt 1 ]; then
+    shift
+    COMMAND="$1"
+    echo $#
+    if [ $# -ge 1 ]; then
+        shift
+    fi
+    eval "${COMMAND}" "${PATH_TARGET}" "$@"
+    exit $?
+elif [ -d "${PATH_TARGET}" ]; then
+    ${LS} ${LS_OPTIONS} "${PATH_TARGET}"
+    exit $?
+else
+    ${CAT} "${PATH_TARGET}"
+    exit $?
+fi
+
+# vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'

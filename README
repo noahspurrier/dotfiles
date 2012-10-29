@@ -1,0 +1,4 @@
+
+These are my universal dotfiles. The script, ".dotfiles", will synchronize the
+directory with the dotfiles on this site using wget.
+

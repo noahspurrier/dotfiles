@@ -1,0 +1,117 @@
+#!/bin/sh
+# 
+# This script updates dotfiles from a remote web server.
+#
+# WARNING! Running this script will overwrite many of your dotfiles!
+# This includes .bashrc, .vimrc and others you may be fond of.
+# Note that this operates in the current working directory.
+# It does not run relative to ~/. or to $HOME, so it is "safe" to
+# run this is a temporary directory to see what it would do if you ran
+# in in your home directory.
+#
+# Put settings that you do not want overwritten in a file called:
+#
+#     ~/.bashrc_local
+#
+# Your .bashrc_local will be sourced at the end of the .bashrc script.
+#
+# And remember, folks:
+#     I am Locutus of Borg. Resistance is futile.
+#     Your life, as it has been, is over.
+#     From this time forward, you will service us.
+
+DOTFILES_URL="http://www.noah.org"
+DOTFILES_TARBALL="dotfiles.tar.gz"
+
+chmod -f 755 $0
+
+exit_error ()
+{
+    message=$1
+    echo
+    echo "=== ERROR ==="
+    echo ${message}
+    exit 2
+}
+
+set_http_get_tool ()
+{
+    # This finds any tool that can be used to download files via HTTP
+    # and set the global variable GET to the path of the tool plus args.
+    # This return 0 if any GET tool is found, else it returns non-zero.
+    http_get_tool=""
+    if type curl >/dev/null 2>&1; then
+        http_get_tool="curl -s"
+    elif type wget >/dev/null 2>&1; then
+        # This is to handle old versions of wget.
+        case $(wget --help 2>&1) in
+            *'BusyBox'* )
+            http_get_tool="wget -O - -q";;
+            *'--no-cache'* )
+            http_get_tool="wget -O - -q -nv --no-cache";; # newer
+            *'--cache=on/off'* )
+            http_get_tool="wget -O - -q -nv --cache=off";; # older
+            * )
+            if type GET >/dev/null 2>&1; then
+                http_get_tool="GET"
+            else
+                return 1 # ERROR
+            fi
+        esac
+    elif type GET >/dev/null 2>&1; then
+        http_get_tool="GET"
+    else
+        return 2 # ERROR
+    fi
+    GET=${http_get_tool}
+    return 0 # OK
+}
+
+# The tarball name may be passed to this script or
+# it will be downloaded using whatever HTTP GET tool is found.
+if false ; then
+    DOTFILES_TARBALL=$1
+else
+    GET=""
+    if ! set_http_get_tool; then
+        echo "Could not find a working curl, wget or GET."
+        exit_error "ERROR: Cannot continue without a download tool."
+    fi
+    rm -f ${DOTFILES_TARBALL}
+    ${GET} ${DOTFILES_URL}/${DOTFILES_TARBALL} > ${DOTFILES_TARBALL}
+    if type md5sum >/dev/null 2>&1; then
+        #MD5_SERVER=$(${GET} ${DOTFILES_URL}/${DOTFILES_TARBALL}.manifest | sed -n -s "/MD5SUM=/s/^.*=\([0-9a-zA-Z]*\).*/\\1/p")
+        MD5_SERVER=$(${GET} ${DOTFILES_URL}/${DOTFILES_TARBALL}.md5 | sed -s "s/\([0-9a-zA-Z]*\).*/\\1/")
+        MD5_LOCAL=$(md5sum ${DOTFILES_TARBALL} | sed -s "s/\([0-9a-zA-Z]*\).*/\\1/")
+        if [ "${MD5_SERVER}" != "${MD5_LOCAL}" ] ; then
+            echo "ERROR: Could not verify ${DOTFILES_TARBALL}."
+            echo "ERROR: The MD5 of the file does not match the one on the server."
+            exit 1
+        fi
+    else
+        # Some systems don't have the stat command... and some don't even have awk!
+        TARBALL_SIZE=$(ls -s ${DOTFILES_TARBALL} | sed 's/ \+.*$//')
+        if [ ${TARBALL_SIZE:-0} -lt 50 ]; then
+            echo "ERROR: Could not verify ${DOTFILES_TARBALL}."
+            echo "ERROR: Download file size is too small."
+            exit 1
+        fi
+    fi
+fi
+
+gunzip -c ${DOTFILES_TARBALL} | tar -x -m -f -
+
+## # This fixes ownership if the root user ran this script.
+## # This is necessary because tar has no portable way to force ownership.
+## ROOT_UID=$(id -u)
+## ROOT_GID=$(id -g)
+## if [ "${ROOT_UID}" = "0" ]; then
+##     for FILE in $(tar ztf ${DOTFILES_TARBALL}); do
+##         chown ${ROOT_UID}:${ROOT_GID} ${FILE}
+##     done
+## fi
+
+chmod 755 .dotfiles_install
+./.dotfiles_install
+rm -f dotfiles.tar.gz
+rm -f .dotfiles_*

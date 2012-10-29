@@ -1,0 +1,11 @@
+#!/bin/sh
+
+#
+# The ~/.backup file should contain a list of files to be rsynced
+# with a remote server.
+#
+# Noah Spurrier
+
+if [ -f ~/.backup ]; then
+    . ~/.backup
+fi

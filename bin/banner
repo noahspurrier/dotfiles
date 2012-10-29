@@ -1,0 +1,636 @@
+#!/usr/bin/env python
+
+"""
+ ####    #   #   # #   # ##### ####
+ #   #  # #  ##  # ##  # #     #   #
+ ####  #   # # # # # # # ####  ####
+ #   # ##### #  ## #  ## #     #  #
+ ####  #   # #   # #   # ##### #   #
+
+SYNOPSIS
+
+    banner [-x] [-5] [-6] [-r] [-g NxN] [-j] [STRING]...
+
+DESCRIPTION
+
+    Banner is a python script that prints a banner in a 6x6 or 5x5 pixel font.
+    It can also create an XPM pixmap of the banner. This is useful for creating
+    icons and labels.
+
+OPTIONS
+
+    -h : display help text
+
+    -5 : use 5x5 font. This is the default. Upper and lower cases are the same.
+
+    -6 : use 6x6 font
+
+    -x : output banner in XPM format. Use with -g to make X11 icons.
+
+    -g : set geometry to a given WIDTHxHEIGHT. This is most useful with -x to
+        create icons. For example, "banner -x -g 32x32 hello world".
+
+    -j : join all words on one line. By default, spaces between words are
+        treated as newlines. As an alternative to -j you can escape or
+        quote individual spaces.
+
+    -r : rotate banner 90 degrees clockwise.
+        This options can be repeated to rotate 180 and 270 degrees.
+
+EXAMPLES
+
+    This demonstrates the basic usage where spaces are treated as newlines.
+    This is useful for appending to /etc/motd or /etc/motd.tail.
+
+        $ banner hello world
+
+        #   # ##### #     #      ###
+        #   # #     #     #     #   #
+        ##### ####  #     #     #   #
+        #   # #     #     #     #   #
+        #   # ##### ##### #####  ###
+
+        #   #  ###  ####  #     ####
+        #   # #   # #   # #      #  #
+        # # # #   # ####  #      #  #
+        ## ## #   # # #   #      #  #
+        #   #  ###  #  #  ##### ####
+
+    There are several ways to prevent the spaces from being treated
+    as newlines.
+        banner hello\\ world
+    or by quoting the string:
+        banner "hello world"
+    or by using the -j option:
+        banner -j hello world
+
+    Example with quoting:
+
+        $ banner "hello world"
+
+        #   # ##### #     #      ###        #   #  ###  ####  #     ####
+        #   # #     #     #     #   #       #   # #   # #   # #      #  #
+        ##### ####  #     #     #   #       # # # #   # ####  #      #  #
+        #   # #     #     #     #   #       ## ## #   # # #   #      #  #
+        #   # ##### ##### #####  ###        #   #  ###  #  #  ##### ####
+
+    This example creates a 32x32 pixmap icon with the label "local host".
+    This is handy for creating text buttons for an X11 desktop panel.
+
+        $ banner -x -g 32x32 local host
+        /* XPM */
+        /* Made with 'banner' http://www.noah.org/banner */
+        static char * banner_xpm[] = {
+        "32 32 3 1",
+        "   c None",
+        ".  c #FFFFFF",
+        "#  c #000000",
+        ...  full output omitted
+        };
+
+EXIT STATUS
+
+    Returns zero exit status on success.
+    Returns non-zero exit status on failure.
+
+VERSION
+
+    Version 2, 2008-12-08
+
+AUTHOR
+
+    Noah Spurrier <noah@noah.org>
+
+LICENSE
+
+    This license is approved by the OSI and FSF as GPL-compatible.
+        http://opensource.org/licenses/isc-license.txt
+
+    Copyright (c) 2008 Noah Spurrier
+    PERMISSION TO USE, COPY, MODIFY, AND/OR DISTRIBUTE THIS SOFTWARE FOR ANY
+    PURPOSE WITH OR WITHOUT FEE IS HEREBY GRANTED, PROVIDED THAT THE ABOVE
+    COPYRIGHT NOTICE AND THIS PERMISSION NOTICE APPEAR IN ALL COPIES.
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+"""
+
+import sys
+import os
+import string
+import getopt
+import traceback
+
+def exit_with_usage(exit_code=1):
+    print globals()['__doc__']
+    sys.exit(exit_code)
+
+# This font storage format is not very efficient, but
+# it is easy to edit with a text editor.
+font_five="""
+|      |      |      |      |   #  |###  #|      |      |
+|      |  ##  | ## ##|  # # |  ####|# # # |  ##  |  ##  |
+|      |  ##  | ## ##| #####| # #  |####  | #  # |  ##  |
+|      |  ##  | ## ##|  # # |  ### |  ####| ###  | #    |
+|      |      |      | #####|   # #| # # #|#   ##|      |
+|      |  ##  |      |  # # | #### |#  ###| ### #|      |
+---------------------------------------------------------
+|  #   |   #  |      |      |      |      |      |      |
+| #    |    # | #   #|   #  |      |      |      |    # |
+| #    |    # |  # # |   #  |      |      |      |   #  |
+| #    |    # | #####| #####|  ##  | #### |      |  #   |
+| #    |    # |  # # |   #  |  ##  |      |  ##  | #    |
+|  #   |   #  | #   #|   #  |   #  |      |  ##  |#     |
+---------------------------------------------------------
+|      |      |      |      |      |      |      |      |
+|  ### |   #  |  ### | #### |    # | #####|  ### | #####|
+| #  ##| ###  | #   #|     #|   ## | #    | #    |     #|
+| # # #|   #  |   ## |  ### |  # # | #### | #### |    # |
+| ##  #|   #  |  #   |     #| #####|     #| #   #|   #  |
+|  ### | #####| #####| #### |    # | #### |  ### |  #   |
+---------------------------------------------------------
+|      |      |      |   ## |    # |      |  #   | #### |
+|  ### |  ### |   ## |   ## |   #  | #### |   #  |     #|
+| #   #| #   #|   ## |      |  #   |      |    # |   ## |
+|  ### |  ####|      |   ## |   #  | #### |   #  |  #   |
+| #   #|     #|   ## |   ## |    # |      |  #   |      |
+|  ### |  ### |   ## |    # |      |      |      |  #   |
+---------------------------------------------------------
+| #### |      |      |      |      |      |      |      |
+|#    #|   #  | #### |  ####| #### | #####| #####|  ####|
+|# ## #|  # # | #   #| #    |  #  #| #    | #    | #    |
+|# ####| #   #| #### | #    |  #  #| #### | #### | # ###|
+|#     | #####| #   #| #    |  #  #| #    | #    | #   #|
+| #### | #   #| #### |  ####| #### | #####| #    |  ### |
+---------------------------------------------------------
+|      |      |      |      |      |      |      |      |
+| #   #|   #  |     #| #  # | #    | #   #| #   #|  ### |
+| #   #|   #  |     #| # #  | #    | ## ##| ##  #| #   #|
+| #####|   #  |     #| ##   | #    | # # #| # # #| #   #|
+| #   #|   #  | #   #| # #  | #    | #   #| #  ##| #   #|
+| #   #|   #  |  ### | #  # | #####| #   #| #   #|  ### |
+---------------------------------------------------------
+|      |      |      |      |      |      |      |      |
+| #### |  ### | #### |  ####| #####| #   #| #   #| #   #|
+| #   #| #   #| #   #| #    |   #  | #   #| #   #| #   #|
+| #### | # # #| #### |  ### |   #  | #   #| #   #| # # #|
+| #    | #  # | # #  |     #|   #  | #   #|  # # | ## ##|
+| #    |  ## #| #  # | #### |   #  |  ### |   #  | #   #|
+---------------------------------------------------------
+|      |      |      | #### |#     | #### |   #  |      |
+| #   #| #   #| #####| #    | #    |    # |  # # |      |
+|  # # |  # # |    # | #    |  #   |    # | #   #|      |
+|   #  |   #  |   #  | #    |   #  |    # |      |      |
+|  # # |   #  |  #   | #    |    # |    # |      |      |
+| #   #|   #  | #####| #### |     #| #### |      |######|
+---------------------------------------------------------
+|  ##  |      |      |      |      |      |      |      |
+|  ##  |   #  | #### |  ####| #### | #####| #####|  ####|
+|   #  |  # # | #   #| #    |  #  #| #    | #    | #    |
+|    # | #   #| #### | #    |  #  #| #### | #### | # ###|
+|      | #####| #   #| #    |  #  #| #    | #    | #   #|
+|      | #   #| #### |  ####| #### | #####| #    |  ### |
+---------------------------------------------------------
+|      |      |      |      |      |      |      |      |
+| #   #|   #  |     #| #  # | #    | #   #| #   #|  ### |
+| #   #|   #  |     #| # #  | #    | ## ##| ##  #| #   #|
+| #####|   #  |     #| ##   | #    | # # #| # # #| #   #|
+| #   #|   #  | #   #| # #  | #    | #   #| #  ##| #   #|
+| #   #|   #  |  ### | #  # | #####| #   #| #   #|  ### |
+---------------------------------------------------------
+|      |      |      |      |      |      |      |      |
+| #### |  ### | #### |  ####| #####| #   #| #   #| #   #|
+| #   #| #   #| #   #| #    |   #  | #   #| #   #| #   #|
+| #### | # # #| #### |  ### |   #  | #   #| #   #| # # #|
+| #    | #  # | # #  |     #|   #  | #   #|  # # | ## ##|
+| #    |  ## #| #  # | #### |   #  |  ### |   #  | #   #|
+---------------------------------------------------------
+|      |      |      |  ### |   #  | ###  | ##   |######|
+| #   #| #   #| #####| #    |   #  |    # |#  # #|######|
+|  # # |  # # |    # |##    |   #  |    ##|    # |######|
+|   #  |   #  |   #  |##    |   #  |    ##|      |######|
+|  # # |   #  |  #   | #    |   #  |    # |      |######|
+| #   #|   #  | #####|  ### |   #  | ###  |      |######|
+"""
+
+font_six= """
+|       |  ###  |### ###|  # #  |   #   |###   #|  ##   |  ###  |
+|       |  ###  |### ###|  # #  |  #### |# #  # | #  #  |  ###  |
+|       |  ###  | #   # |#######| # #   |### #  |  ##   |   #   |
+|       |   #   | #   # |  # #  | ##### |   #   | ###   |   #   |
+|       |       |       |#######|   #  #|  # ###|#   # #|       |
+|       |  ###  |       |  # #  | ##### | #  # #|#    # |       |
+|       |  ###  |       |  # #  |   #   |#   ###| #### #|       |
+-----------------------------------------------------------------
+|   #   |   #   |       |       |       |       |       |      #|
+|  #    |    #  | #   # |   #   |       |       |       |     # |
+| #     |     # |  # #  |   #   |       |       |       |    #  |
+| #     |     # |#######| ##### |  ###  | ##### |       |   #   |
+| #     |     # |  # #  |   #   |  ###  |       |  ###  |  #    |
+|  #    |    #  | #   # |   #   |   #   |       |  ###  | #     |
+|   #   |   #   |       |       |  #    |       |  ###  |#      |
+-----------------------------------------------------------------
+|       |       |       |       |       |       |       |       |
+|   ##  |   #   |  #### | ##### |    ## | ######|  #### | ######|
+|  #  # | ###   | #    #|      #|   # # | #     | #     |     # |
+| #  # #|   #   |    ## |  #### |  #  # | ##### | # ### |    #  |
+| # #  #|   #   |  ##   |      #| ######|      #| ##   #|   #   |
+|  #  # |   #   | #     |      #|     # | #    #| #    #|  #    |
+|   ##  | ##### | ######| ##### |     # |  #### |  #### |  #    |
+-----------------------------------------------------------------
+|       |       |   #   |  ###  |    #  |       |  #    |       |
+|  #### |  #### |  ###  |  ###  |   #   |       |   #   |  #### |
+| #    #| #    #|   #   |       |  #    | ##### |    #  | #    #|
+|  #### | #    #|       |  ###  | #     |       |     # |    ## |
+| #    #|  #####|   #   |  ###  |  #    | ##### |    #  |   #   |
+| #    #|      #|  ###  |   #   |   #   |       |   #   |       |
+|  #### |  #### |   #   |  #    |    #  |       |  #    |   #   |
+-----------------------------------------------------------------
+|       |       |       |       |       |       |       |       |
+|  #### |   ##  | ##### |  #### | ##### | ######| ######|  #### |
+| #    #|  #  # | #    #| #    #| #    #| #     | #     | #    #|
+| # ## #| #    #| ##### | #     | #    #| ##### | ##### | #     |
+| # ####| ######| #    #| #     | #    #| #     | #     | #  ###|
+| #     | #    #| #    #| #    #| #    #| #     | #     | #    #|
+|  #### | #    #| ##### |  #### | ##### | ######| #     |  #### |
+-----------------------------------------------------------------
+|       |       |       |       |       |       |       |       |
+| #    #|    #  |      #| #    #| #     | #    #| #    #|  #### |
+| #    #|    #  |      #| #   # | #     | ##  ##| ##   #| #    #|
+| #    #|    #  |      #| ####  | #     | # ## #| # #  #| #    #|
+| ######|    #  |      #| #  #  | #     | #    #| #  # #| #    #|
+| #    #|    #  | #    #| #   # | #     | #    #| #   ##| #    #|
+| #    #|    #  |  #### | #    #| ######| #    #| #    #|  #### |
+-----------------------------------------------------------------
+|       |       |       |       |       |       |       |       |
+| ##### |  #### | ##### |  #### |  #####| #    #| #    #| #    #|
+| #    #| #    #| #    #| #     |    #  | #    #| #    #| #    #|
+| #    #| #    #| #    #|  #### |    #  | #    #| #    #| #    #|
+| ##### | #  # #| ##### |      #|    #  | #    #| #    #| # ## #|
+| #     | #   # | #   # | #    #|    #  | #    #|  #  # | ##  ##|
+| #     |  ### #| #    #|  #### |    #  |  #### |   ##  | #    #|
+-----------------------------------------------------------------
+|       |       |       | ##### |#      | ##### |   #   |       |
+| #    #|  #   #| ######| #     | #     |     # |  # #  |       |
+|  #  # |   # # |     # | #     |  #    |     # | #   # |       |
+|   ##  |    #  |    #  | #     |   #   |     # |       |       |
+|   ##  |    #  |   #   | #     |    #  |     # |       |       |
+|  #  # |    #  |  #    | #     |     # |     # |       |       |
+| #    #|    #  | ######| ##### |      #| ##### |       |#######|
+-----------------------------------------------------------------
+|  ###  |       |       |       |       |       |       |       |
+|  ###  |   ##  | ##### |  #### | ##### | ######| ######|  #### |
+|   #   |  #  # | #    #| #    #| #    #| #     | #     | #    #|
+|    #  | #    #| ##### | #     | #    #| ##### | ##### | #     |
+|       | ######| #    #| #     | #    #| #     | #     | #  ###|
+|       | #    #| #    #| #    #| #    #| #     | #     | #    #|
+|       | #    #| ##### |  #### | ##### | ######| #     |  #### |
+-----------------------------------------------------------------
+|       |       |       |       |       |       |       |       |
+| #    #|    #  |      #| #    #| #     | #    #| #    #|  #### |
+| #    #|    #  |      #| #   # | #     | ##  ##| ##   #| #    #|
+| #    #|    #  |      #| ####  | #     | # ## #| # #  #| #    #|
+| ######|    #  |      #| #  #  | #     | #    #| #  # #| #    #|
+| #    #|    #  | #    #| #   # | #     | #    #| #   ##| #    #|
+| #    #|    #  |  #### | #    #| ######| #    #| #    #|  #### |
+-----------------------------------------------------------------
+|       |       |       |       |       |       |       |       |
+| ##### |  #### | ##### |  #### |  #####| #    #| #    #| #    #|
+| #    #| #    #| #    #| #     |    #  | #    #| #    #| #    #|
+| #    #| #    #| #    #|  #### |    #  | #    #| #    #| #    #|
+| ##### | #  # #| ##### |      #|    #  | #    #| #    #| # ## #|
+| #     | #   # | #   # | #    #|    #  | #    #|  #  # | ##  ##|
+| #     |  ### #| #    #|  #### |    #  |  #### |   ##  | #    #|
+-----------------------------------------------------------------
+|       |       |       |  ###  |   #   |  ###  | ##    |#######|
+| #    #|  #   #| ######| #     |   #   |     # |#  #  #|#######|
+|  #  # |   # # |     # | #     |   #   |     # |    ## |#######|
+|   ##  |    #  |    #  |##     |   #   |     ##|       |#######|
+|   ##  |    #  |   #   | #     |   #   |     # |       |#######|
+|  #  # |    #  |  #    | #     |   #   |     # |       |#######|
+| #    #|    #  | ######|  ###  |   #   |  ###  |       |#######|
+"""
+
+# HACK: trim the leading newline off the fonts.
+# I added the newline so the first line of the fonts would
+# line up with the rest of the lines.
+font_six = font_six[1:]
+font_five= font_five[1:]
+
+def dump_xpm (page, geometry=(32,32)):
+
+    """This dumps the given page to stdout in XPM pixmap format."""
+
+    if geometry is not None:
+        page = crop (page, geometry)
+    pixel_width = len(page[0])
+    pixel_height= len(page)
+    xpm_header = """/* XPM */
+/* Made with 'banner' http://www.noah.org/banner */
+static char * banner_xpm[] = {
+"%(pixel_width)d %(pixel_height)d 3 1",
+"   c None",
+".  c #FFFFFF",
+"#  c #000000",
+""" % locals()
+    print xpm_header
+    for l in page:
+        print '"' + l + '",'
+    print "};"
+
+def dump_page (page):
+
+    """This dumps the given page to stdout."""
+
+    for l in page:
+        print l
+
+def rotate (page):
+
+    """This returns the give page rotated clockwise by 90 degrees."""
+
+    new_page = []
+    for vl in zip(*page):
+        ll = list(vl)
+        ll.reverse()
+        new_page.append(string.join(ll,sep=''))
+        #print string.join(ll,sep='')
+    return new_page
+
+def hcenter (page, pixel_width):
+
+    """This centers the "page" horizontally in the given width."""
+
+    page_pixel_width = len(page[0])
+    pad = pixel_width - page_pixel_width
+    left_pad = pad/2
+    right_pad = pad/2
+    if left_pad+right_pad < pad:
+        left_pad = left_pad + 1
+    new_page = []
+    for r in page:
+        r = ' '*left_pad + r + ' '*right_pad
+        new_page.append(r)
+    return new_page
+
+def vcenter (page, pixel_height):
+
+    """This centers the "page" vertically in the given height."""
+
+    page_pixel_height = len(page)
+    pad = pixel_height - page_pixel_height
+    top_pad = pad/2
+    bottom_pad = pad/2
+    if top_pad+bottom_pad < pad:
+        bottom_pad = bottom_pad + 1
+    new_page = []
+    for r in range(top_pad):
+        new_page.append(' '*len(page[0]))
+    for r in page:
+        new_page.append(r)
+    for r in range(bottom_pad):
+        new_page.append(' '*len(page[0]))
+    return new_page
+
+def c_to_coord(c):
+
+    """This takes an ascii character and returns the coordinates
+    in the 8x11 array of character raster data.
+    The 8x11 arrays of character raster data are arranged like this:
+
+     !"#$%&'
+    ()*+,-./
+    01234567
+    89:;<=>?
+    @ABCDEFG
+    HIJKLMNO
+    PQRSTUVW
+    XYZ[\]^_
+    `abcdefg
+    hijklmno
+    pqrstuvw
+    xyz{|}~
+    """
+
+    i = ord(c)-32
+    y = i/8
+    x = i%8
+    if x < 0: x = 7;y = 11
+    if x > 7: x = 7;y = 11
+    if y < 0: x = 7;y = 11
+    if y > 11: x = 7;y = 11
+    return (x,y)
+
+def get_raster_data_by_char_five (c=None):
+
+    """This returns the raster data for the given character. """
+
+    if c is None:
+        return ['','','','','','']
+    return get_raster_data_five(*c_to_coord(c))
+
+def get_raster_data_by_char_six (c=None):
+
+    """This returns the raster data for the given character. """
+
+    if c is None:
+        return ['','','','','','','']
+    return get_raster_data_six(*c_to_coord(c))
+
+def get_raster_data_five (x,y):
+
+    """This returns the raster data for the given coordinate. """
+
+    start = (58*(7*y))+(7*x)+1
+    letter = []
+    letter.append(font_five[start:start+6])
+    start = start + 58
+    letter.append(font_five[start:start+6])
+    start = start + 58
+    letter.append(font_five[start:start+6])
+    start = start + 58
+    letter.append(font_five[start:start+6])
+    start = start + 58
+    letter.append(font_five[start:start+6])
+    start = start + 58
+    letter.append(font_five[start:start+6])
+    return letter
+
+def get_raster_data_six (x,y):
+
+    """This returns the raster data for the given coordinate. """
+
+    start = (66*(8*y))+(8*x)+1
+    letter = []
+    letter.append(font_six[start:start+7])
+    start = start + 66
+    letter.append(font_six[start:start+7])
+    start = start + 66
+    letter.append(font_six[start:start+7])
+    start = start + 66
+    letter.append(font_six[start:start+7])
+    start = start + 66
+    letter.append(font_six[start:start+7])
+    start = start + 66
+    letter.append(font_six[start:start+7])
+    start = start + 66
+    letter.append(font_six[start:start+7])
+    return letter
+
+def append_raster_data (left_data, right_data):
+
+    """This appends the given raster data in right_data to the right side of
+    left_data. Note that weird things will happen if left_data and right_data
+    are different heights.
+    """
+
+    return [z[0]+z[1] for z in zip(left_data,right_data)]
+
+def vappend_raster_data (top_data, bottom_data):
+
+    """This appends the given raster data in bottom_data to the bottom of the
+    top_data. Note that the final width will grow to fit the widest band of
+    data. The smaller band will be centered.
+    """
+
+    width_top_data = len(top_data[0])
+    width_bottom_data = len(bottom_data[0])
+    max_width = max(width_top_data,width_bottom_data)
+    top_data = hcenter(top_data, max_width)
+    bottom_data = hcenter(bottom_data, max_width)
+    new_word = []
+    for l in top_data:
+        new_word.append(l)
+    for l in bottom_data:
+        new_word.append(l)
+    return new_word
+
+def append_letter_five (w1, c):
+
+    letter = get_raster_data_by_char_five(c)
+    return append_raster_data(w1, letter)
+
+def append_string_five (word, s):
+
+    if word is None:
+        word = get_raster_data_by_char_five(None)
+    for c in s:
+        word = append_letter_five(word, c)
+    return word
+
+def append_letter_six (w1, c):
+
+    letter = get_raster_data_by_char_six(c)
+    return append_raster_data(w1, letter)
+
+def append_string_six (word, s):
+
+    if word is None:
+        word = get_raster_data_by_char_six(None)
+    for c in s:
+        word = append_letter_six(word, c)
+    return word
+
+def crop (page, geometry):
+
+    """This crops the raster data to the given geometry.
+    It also centers and grows the raster data to fit the given geometry.
+    """
+
+    if len(page) > geometry[1]:
+        page = page [0:geometry[1]]
+    else:
+        page = vcenter (page, geometry[1])
+    if len(page[0]) > geometry[0]:
+        new_page = []
+        for p in page:
+            new_page.append(p[0:geometry[0]])
+        page = new_page
+    else:
+        page = hcenter(page, geometry[0])
+    return page
+
+def main ():
+
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:], 'h?56xrjg:', ['help','h','?'])
+        options = dict(optlist)
+        # There are a million ways to cry for help. These are but a few of them.
+        if [elem for elem in options if elem in ['-h','--h','-?','--?','--help']]:
+            exit_with_usage(0)
+        #if len(options)==0 and len(args)==0:
+        #    exit_with_usage(0)
+    except Exception, e:
+        print str(e)
+        exit_with_usage()
+
+    if '-j' in options:
+        args = [string.join(args)]
+
+    if len(args) == 0:
+        args = sys.stdin.read()
+        args = args.split()
+
+    #
+    # Start building the banner
+    #
+
+    # build up an array of "bands". Each band is the raster data
+    # for one line of the string.
+    # This handle either 6 pixel or 5 pixel raster data.
+    raster_bands = []
+    if '-6' in options:
+        for m in args:
+            raster_bands.append(append_string_six(None, m))
+    else:
+        for m in args:
+            raster_bands.append(append_string_five(None, m))
+
+    # stack raster bands on top of each other to form one "page".
+    # grow to fit widest line.
+    page = raster_bands[0]
+    for w in raster_bands[1:]:
+        page = vappend_raster_data(page, w)
+
+    # This rotates 90 degrees clockwise
+    # once for each -v option on the command line.
+    for vees in optlist:
+        if vees[0]=='-r':
+            page = rotate(page)
+
+    # This crops the raster data to the given geometry.
+    # It also centers and grows the raster data to fit
+    # the given geometry.
+    g = None
+    if '-g' in options:
+        g = options['-g'].split('x')
+        g[0] = int(g[0])
+        g[1] = int(g[1])
+        if g[0]<1 or g[1]<1:
+            print ("ERROR: geometry is impossibly small.")
+            exit_with_usage(4)
+        crop(page, g)
+
+    # This handles the output.
+    if '-x' in options:
+        dump_xpm(page,g)
+    else:
+        dump_page (page)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception, e:
+        tb_dump = traceback.format_exc()
+        print "==============================================================="
+        print "ERROR -- Unexpected exception in script."
+        print str(e)
+        print str(tb_dump)
+        print "==============================================================="
+        exit_with_usage(3)
+

@@ -1,0 +1,453 @@
+#!/usr/bin/env python
+# vim:set ft=python fileencoding=utf-8 sr et ts=4 sw=4 : See help 'modeline'
+"""
+SYNOPSIS
+
+    entropy-source [-h,--help] [-v,--verbose] [--version]
+
+DESCRIPTION
+
+    This docstring will be printed by the script if there is an error or
+    if the user requests help (-h or --help).
+
+    Note that you may wish to disable the entropy mouse under X11.
+    This will not disable it under /dev/input, so it will still
+    be a source of entropy.
+    First identify which mouse you wish to disable.
+        xinput --list
+    Next find the ID of the 'Device Enabled' property of the mouse.
+        xinput --list-props 16
+    Finally, set the 'Device Enabled' property to zero.
+        xinput --set-prop 16 145 0
+
+EXAMPLES
+
+    $ sudo ./entropy-source >> entropy-source.bin &
+    [1] 4711
+    $ sudo ./entropy-source | od -x
+    0000000 0bbd b360 4887 5b06 213e 53e3 becc bd08
+    0000020 4552 056f 6698 be45 2e67 f78a 43b1 44ee
+    0000040 a61d 6ba0 feb4 40c6 e057 34f8 0f9a dcfa
+
+    $ sudo ./entropy-source >> entropy-source.bin &
+    $ ./histogram.py entropy-source.bin | egrep -v "^\s*#" | awk '{print $2}' | graph --auto-abscissa 1.0 -r 0.1 -u 0.1 -h 0.8 -w 0.8 --bitmap-size 1024x768 -F HersheySans -T png | display -
+
+EXIT STATUS
+
+    This exits with status 0 on success and 1 otherwise.
+    This exits with a status greater than 1 if there was an
+    unexpected run-time error.
+
+AUTHOR
+
+    Noah Spurrier <noah@noah.org>
+
+LICENSE
+
+    This license is approved by the OSI and FSF as GPL-compatible.
+        http://opensource.org/licenses/isc-license.txt
+
+    Copyright (c) 2012, Noah Spurrier <noah@noah.org>
+    PERMISSION TO USE, COPY, MODIFY, AND/OR DISTRIBUTE THIS SOFTWARE FOR ANY
+    PURPOSE WITH OR WITHOUT FEE IS HEREBY GRANTED, PROVIDED THAT THE ABOVE
+    COPYRIGHT NOTICE AND THIS PERMISSION NOTICE APPEAR IN ALL COPIES.
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+VERSION
+
+    Version 1
+"""
+
+import sys
+import os
+import struct
+import time
+import fcntl
+import time
+import traceback
+#import argparse
+
+# From from pycopia.OS.Linux.IOCTL Keith Dart <keith@kdart.com>
+# From ioctl.h
+# ioctl command encoding: 32 bits total, command in lower 16 bits,
+# size of the parameter structure in the lower 14 bits of the
+# upper 16 bits.
+# Encoding the size of the parameter structure in the ioctl request
+# is useful for catching programs compiled with old versions
+# and to avoid overwriting user space outside the user buffer area.
+# The highest 2 bits are reserved for indicating the ``access mode''.
+# NOTE: This limits the max parameter size to 16kB -1 !
+#
+# The following is for compatibility across the various Linux
+# platforms.  The i386 ioctl numbering scheme doesn't really enforce
+# a type field.  De facto, however, the top 8 bits of the lower 16
+# bits are indeed used as a type field, so we might just as well make
+# this explicit here.  Please be sure to use the decoding macros
+# below from now on.
+INT = "i"
+INT2 = "ii"
+INT5 = "iiiii"
+SHORT = "h"
+USHORT = "H"
+SHORT4 = "hhhh"
+
+sizeof = struct.calcsize
+
+_IOC_NRBITS = 8
+_IOC_TYPEBITS = 8
+_IOC_SIZEBITS = 14
+_IOC_DIRBITS = 2
+_IOC_NRMASK = ((1 << _IOC_NRBITS)-1)
+_IOC_TYPEMASK = ((1 << _IOC_TYPEBITS)-1)
+_IOC_SIZEMASK = ((1 << _IOC_SIZEBITS)-1)
+_IOC_DIRMASK = ((1 << _IOC_DIRBITS)-1)
+_IOC_NRSHIFT = 0
+_IOC_TYPESHIFT = (_IOC_NRSHIFT+_IOC_NRBITS)
+_IOC_SIZESHIFT = (_IOC_TYPESHIFT+_IOC_TYPEBITS)
+_IOC_DIRSHIFT = (_IOC_SIZESHIFT+_IOC_SIZEBITS)
+IOCSIZE_MASK = (_IOC_SIZEMASK << _IOC_SIZESHIFT)
+IOCSIZE_SHIFT = (_IOC_SIZESHIFT)
+
+# direction bits
+_IOC_NONE = 0
+_IOC_WRITE = 1
+_IOC_READ = 2
+
+def _IOC(dir,type,nr,FMT):
+    return int((((dir)  << _IOC_DIRSHIFT) | \
+         ((type) << _IOC_TYPESHIFT) | \
+         ((nr)   << _IOC_NRSHIFT) | \
+         ((FMT) << _IOC_SIZESHIFT)) & 0xffffffff )
+
+# used to create numbers
+# type is the assigned type from the kernel developers
+# nr is the base ioctl number (defined by driver writer)
+# FMT is a struct module format string.
+def _IO(type,nr): return _IOC(_IOC_NONE,(type),(nr),0)
+def _IOR(type,nr,FMT): return _IOC(_IOC_READ,(type),(nr),sizeof(FMT))
+def _IOW(type,nr,FMT): return _IOC(_IOC_WRITE,(type),(nr),sizeof(FMT))
+def _IOWR(type,nr,FMT): return _IOC(_IOC_READ|_IOC_WRITE,(type),(nr),sizeof(FMT))
+
+# used to decode ioctl numbers
+def _IOC_DIR(nr): return (((nr) >> _IOC_DIRSHIFT) & _IOC_DIRMASK)
+def _IOC_TYPE(nr): return (((nr) >> _IOC_TYPESHIFT) & _IOC_TYPEMASK)
+def _IOC_NR(nr): return (((nr) >> _IOC_NRSHIFT) & _IOC_NRMASK)
+def _IOC_SIZE(nr): return (((nr) >> _IOC_SIZESHIFT) & _IOC_SIZEMASK)
+
+# taken from /usr/include/linux/input.h
+EVIOCGVERSION   = _IOR(69, 0x01, INT)           # get driver version
+EVIOCGID        = _IOR(69, 0x02, SHORT4)        # get device ID
+EVIOCGREP       = _IOR(69, 0x03, INT2)          # get repeat settings
+EVIOCSREP       = _IOW(69, 0x03, INT2)          # set repeat settings
+EVIOCGKEYCODE   = _IOR(69, 0x04, INT2)          # get keycode
+EVIOCSKEYCODE   = _IOW(69, 0x04, INT2)          # set keycode
+EVIOCGKEY       = _IOR(69, 0x05, INT2)          # get key value
+EVIOCGNAME      = _IOC(_IOC_READ, 69, 0x06, 255)# get device name
+EVIOCGPHYS      = _IOC(_IOC_READ, 69, 0x07, 255)# get physical location
+EVIOCGUNIQ      = _IOC(_IOC_READ, 69, 0x08, 255)# get unique identifier
+EVIOCRMFF       = _IOW(69, 0x81, INT)           # Erase a force effect
+EVIOCSGAIN      = _IOW(69, 0x82, USHORT)        # Set overall gain
+EVIOCSAUTOCENTER= _IOW(69, 0x83, USHORT)        # Enable or disable auto-centering
+EVIOCGEFFECTS   = _IOR(69, 0x84, INT)           # Report number of effects playable at the same time
+EVIOCGRAB       = _IOW(69, 0x90, INT)          # Grab/Release device
+
+# these take parameters.
+def EVIOCGBIT(evtype, len=255):
+    return _IOC(_IOC_READ, 69, 0x20 + evtype, len)  # get event bits
+def EVIOCGABS(abs):
+    return _IOR(69, 0x40 + abs, INT5)       # get abs value/limits
+def EVIOCGSW(len):
+    return _IOC(_IOC_READ, 69, 0x1b, len)   # get all switch states
+def EVIOCGLED(len):
+    return _IOC(_IOC_READ, 69, 0x19, len)   #  get all LEDs
+
+#struct input_event {
+#        struct timeval time; = {long seconds, long microseconds}
+#        unsigned short type;
+#        unsigned short code;
+#        unsigned int value;
+#};
+
+EVFMT = "llHHi"
+EVsize = struct.calcsize(EVFMT)
+
+EV_SYN = 0x00
+EV_KEY = 0x01
+EV_REL = 0x02
+EV_ABS = 0x03
+EV_MSC = 0x04
+EV_SW = 0x05
+EV_LED = 0x11
+EV_SND = 0x12
+EV_REP = 0x14
+EV_FF = 0x15
+EV_PWR = 0x16
+EV_FF_STATUS = 0x17
+EV_MAX = 0x1f
+
+class Features(object):
+    """Contains a set of base features.
+    """
+    NAMES = {
+        EV_SYN: "Sync",
+        EV_KEY: "Keys or Buttons",
+        EV_REL: "Relative Axes",
+        EV_ABS: "Absolute Axes",
+        EV_MSC: "Miscellaneous",
+        EV_SW: "Switches",
+        EV_LED: "Leds",
+        EV_SND: "Sound",
+        EV_REP: "Repeat",
+        EV_FF: "Force Feedback",
+        EV_PWR: "Power Management",
+        EV_FF_STATUS: "Force Feedback Status",
+    }
+
+    def __init__(self, bits=0):
+        self._bits = bits
+
+    def has_keys(self):
+        return (self._bits >> EV_KEY) & 1
+
+    def has_leds(self):
+        return (self._bits >> EV_LED) & 1
+
+    def has_sound(self):
+        return (self._bits >> EV_SND) & 1
+
+    def has_relative_axes(self):
+        return (self._bits >> EV_REL) & 1
+
+    def has_absolute_axes(self):
+        return (self._bits >> EV_ABS) & 1
+
+    def has_misc(self):
+        return (self._bits >> EV_MSC) & 1
+
+    def has_switches(self):
+        return (self._bits >> EV_SW) & 1
+
+    def has_repeat(self):
+        return (self._bits >> EV_REP) & 1
+
+    def has_forcefeedback(self):
+        return (self._bits >> EV_FF) & 1
+
+    def has_forcefeedback_status(self):
+        return (self._bits >> EV_FF_STATUS) & 1
+
+    def has_power(self):
+        return (self._bits >> EV_PWR) & 1
+
+    def _make_set(self):
+        featureset = set()
+        bits = self._bits
+        for bit in (EV_KEY, EV_REL, EV_ABS, EV_MSC, EV_SW, EV_LED, EV_SND, EV_REP, EV_FF, EV_PWR, EV_FF_STATUS):
+            if (bits >> bit) & 1:
+                featureset.add(bit)
+        return featureset
+
+    def match(self, other):
+        pass #XXX
+
+    def __str__(self):
+        s = []
+        bits = self._bits
+        for bit, name in self.NAMES.items():
+            if (bits >> bit) & 1:
+                s.append(name)
+        return ", ".join(s)
+
+
+class Event(object):
+    """This structure is the collection of data for the general event
+    interface. You can create one to write to an event device. If you read from
+    the event device using a subclass of the EventDevice object you will get one of these.
+    """
+    def __init__(self, time=0.0, evtype=0, code=0, value=0):
+        self.time = time # timestamp of the event in Unix time.
+        self.evtype = evtype # even type (one of EV_* constants)
+        self.code = code     # a code related to the event type
+        self.value = value   # custom data - meaning depends on type above
+
+    def __str__(self):
+        return "time: %f, type: 0x%x, code: 0x%x, value: 0x%x" % \
+                    (self.time, self.evtype, self.code, self.value)
+
+    def encode(self):
+        tv_sec, tv_usec = divmod(self.time, 1.0)
+        return struct.pack(EVFMT, long(tv_sec), long(tv_usec*1000000.0), self.evtype, self.code, self.value)
+
+    def decode(self, ev):
+        tv_sec, tv_usec, self.evtype, self.code, self.value = struct.unpack(EVFMT, ev)
+        self.time = float(tv_sec) + float(tv_usec)/1000000.0
+
+class EventDevice(object):
+    def __init__(self, fname=None):
+        self._fd = None
+        self.name = ""
+        self._eventq = []
+        self.idbus = self.idvendor = self.idproduct = self.idversion = None
+        if fname:
+            self.open(fname)
+
+    def __str__(self):
+        if self.idbus is None:
+            self.get_deviceid()
+        return "%s: bus=0x%x, vendor=0x%x, product=0x%x, version=0x%x\n   %s" % \
+            (self.name, self.idbus, self.idvendor, self.idproduct, self.idversion, self.get_features())
+
+    def _fill(self):
+        global EVsize
+        try:
+            #raw = os.read(self._fd, EVsize * 32)
+            raw = os.read(self._fd, EVsize)
+        except EOFError:
+            self.close()
+        else:
+            if raw:
+                for i in range(len(raw)/EVsize):
+                    ev = Event()
+                    ev.decode(raw[i*EVsize:(i+1)*EVsize])
+                    self._eventq.append(ev)
+
+    def open(self, filename):
+        self._fd = os.open(filename, os.O_RDWR)
+        name = fcntl.ioctl(self._fd, EVIOCGNAME, chr(0) * 256)
+        self.name = name.replace(chr(0), '')
+
+    def fileno(self):
+        return self._fd
+
+    def close(self):
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
+            self.name = ""
+
+    def read(self):
+        if not self._eventq:
+            self._fill()
+        return self._eventq.pop()
+
+    def readall(self):
+        ev = self.read()
+        while ev:
+            yield ev
+            ev = self.read()
+
+    def write(self, evtype, code, value):
+        ev = Event(0.0, evtype, code, value)
+        return os.write(self._fd, ev.encode())
+
+    def get_driverversion(self):
+        ver = fcntl.ioctl(self._fd, EVIOCGVERSION, '\x00\x00\x00\x00')
+        return struct.unpack(INT, ver)[0]
+
+    def get_deviceid(self):
+        ver = fcntl.ioctl(self._fd, EVIOCGID, '\x00\x00\x00\x00\x00\x00\x00\x00')
+        self.idbus, self.idvendor, self.idproduct, self.idversion = struct.unpack(SHORT4, ver)
+        return self.idbus, self.idvendor, self.idproduct, self.idversion
+
+    def get_features(self):
+        caps = fcntl.ioctl(self._fd, EVIOCGBIT(0), '\x00\x00\x00\x00')
+        caps = struct.unpack(INT, caps)[0]
+        return Features(caps)
+
+
+def get_device_names(start=0):
+    """Returns a list of tuples containing (index, devicename).
+    """
+    names = []
+    for d in range(start, 16):
+        filename = "/dev/input/event%d" % (d,)
+        if os.path.exists(filename):
+            try:
+                    fd = os.open(filename, os.O_RDWR)
+                    try:
+                        name = fcntl.ioctl(fd, EVIOCGNAME, chr(0) * 256)
+                    finally:
+                        os.close(fd)
+                    name = name.replace(chr(0), '')
+            except (OSError, IOError): # probably no permissions
+                continue
+            else:
+                names.append((d, name))
+    return names
+
+
+def get_devices(start=0):
+    devs = []
+    for d in range(start, 16):
+        filename = "/dev/input/event%d" % (d,)
+        if os.path.exists(filename):
+            devs.append(EventDevice(filename))
+    return devs
+
+def mouse_motion (input_device='/dev/input/event6'):
+    ed = EventDevice(input_device)
+    while True:
+        ev = ed.read()
+        if ev.evtype == EV_REL:
+            yield ev.value
+
+def entropy_bits(input_device='/dev/input/event6'):
+    motion = mouse_motion(input_device)
+    while motion:
+        bit1 = motion.next() % 2
+        bit2 = motion.next() % 2
+        if bit1 == bit2:
+            continue
+        yield bit2
+
+def entropy_bytes (input_device='/dev/input/event6'):
+    bit_source = entropy_bits(input_device)
+    while bit_source:
+        byte = 0x00
+        for nn in range(8):
+            byte = byte<<1
+            bit = bit_source.next()
+            byte = byte|bit
+        yield byte
+
+def main (options, args):
+    entropy_source = entropy_bytes('/dev/input/event16')
+    for byte in entropy_source:
+        sys.stdout.write(chr(byte))
+        sys.stdout.flush()
+
+if __name__ == "__main__":
+    try:
+        start_time = time.time()
+#        parser = argparse.ArgumentParser(version=1)
+#        parser.add_argument('-v', '--verbose', action='store_true',
+#                default=False, help='verbose output')
+#        (options, args) = parser.parse_args()
+        #if len(args) < 1:
+        #    parser.error ('missing argument')
+#        if options.verbose: print(time.asctime())
+        options = None
+        args = None
+        exit_code = main(options, args)
+        if exit_code is None:
+            exit_code = 0
+        if options.verbose:
+            print (time.asctime())
+            print ('TOTAL TIME IN MINUTES: %f'%((time.time()-start_time)/60.0))
+        sys.exit(exit_code)
+    except KeyboardInterrupt as e: # The user pressed Ctrl-C.
+        raise e
+    except SystemExit as e: # The script called sys.exit() somewhere.
+        raise e
+    except Exception as e:
+        print ('ERROR: Unexpected Exception')
+        print (str(e))
+        traceback.print_exc()
+        os._exit(2)
+

@@ -1,0 +1,265 @@
+#!/bin/sh
+
+######################################################################
+#
+# roll
+#
+# SYNOPSIS
+#
+#     roll [-h] [-v,--verbose] [--version] {FILENAME}
+#
+# DESCRIPTION
+#
+#     This script rolls a set of file names through a numeric sequence.
+#     The purpose is to allow a rolling backup of things like
+#     backups and log files. The given FILENAME will be renamed with
+#     an integer before the extension. All files in the same directory
+#     will a similar filename pattern will have their integer sequence
+#     incremented.
+#         service.log --> service.1.log
+#         service.1.log --> service.2.log
+#         service.2.log --> service.3.log
+#
+#     Note that this script is not atomic. If you stop the script while
+#     it is running then you may end up with missing files.
+#
+# EXAMPLES
+#
+#     roll service.log
+#
+# EXIT STATUS
+#
+#     This exits with status 0 on success or non-zero on error.
+#
+# AUTHOR
+#
+#     Noah Spurrier <noah@noah.org>
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible.
+#     This license identical to the ISC License and is registered with and
+#     approved by the Open Source Initiative. For more information vist:
+#         http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c) 2012, Noah Spurrier
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# VERSION
+#
+#     Version 1
+#
+######################################################################
+
+canonical () {
+	# This returns the canonical path to the argument.
+	# The argument must exist as either a dir or file.
+	# This works in a pure POSIX environment.
+
+	if [ -d "${1}" ]; then
+		# `cd` requires execute permission on the dir.
+		if [ ! -x "${1}" ]; then
+			canon=""
+			return 1
+		fi
+		oldwd=$(pwd)
+		cd ${1}
+		canon=$(pwd)
+		# Check special case of `pwd` on root directory.
+		if [ -n "${canon#/*}" ]; then
+			canon=${canon}/
+		fi
+		cd "${oldwd}"
+	else
+		# At this point we know it isn't a dir.
+		# But if it looks like a dir then error.
+		if [ -z "${1##*/}" ]; then
+			canon=""
+			return 1
+		fi
+		# It looks like a path to a file.
+		# Test the if the path before the file is a dir.
+		dirname=$(dirname "$1")
+		if [ -d "${dirname}" ]; then
+			# `cd` requires execute permission on the dir.
+			if [ ! -x "${dirname}" ]; then
+				canon=""
+				return 1
+			fi
+			oldwd=$(pwd)
+			cd "${dirname}"
+			canon=$(pwd)
+			# Check special case of `pwd` on root directory.
+			if [ -z "${canon#/*}" ]; then
+				canon=/$(basename "$1")
+			else
+				canon=${canon}/$(basename "$1")
+			fi
+			cd "${oldwd}"
+		else
+			# It isn't anything so error.
+			canon=""
+			return 1
+		fi
+	fi
+	echo "${canon}"
+	return 0
+}
+
+######################################################################
+# Debug
+######################################################################
+
+# This makes the debug output of `set +x` (set -o xtrace) easier to read.
+# DO NOT export this. It will crash POSIX shell subshells and scripts.
+[ -n "$BASH" ] && PS4='+${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]}: '
+# set -o trace xtrace
+# Do not allow use of unset variables.
+#set -o nounset
+# Exit script if it does not catch an error from any command it runs.
+# For example, this will exit the script:
+#     false
+# This will not exit the script
+#     if false; then echo "This will never be printed."; fi
+#set -o errexit
+
+#####################################################################
+# Color
+#####################################################################
+
+# Don't use color if there is no terminal on stdout.
+if type tput >/dev/null 2>/dev/null && tty <&1 >/dev/null 2>&1; then
+	COLOR_RED="$(tput setaf 1)"
+	COLOR_GRN="$(tput setaf 2)"
+	COLOR_BLU="$(tput setaf 4)"
+	COLOR_YEL="$(tput setaf 3)"
+	COLOR_OFF="$(tput sgr0)"
+else
+	COLOR_RED=""
+	COLOR_GRN=""
+	COLOR_BLU=""
+	COLOR_YEL=""
+	COLOR_OFF=""
+fi
+
+#####################################################################
+# Exit cleanup
+#####################################################################
+
+exit_with_message() {
+	local EXIT_CODE="${1:-0}"
+	local EXIT_MESSAGE="${2:-''}"
+
+	# Exit with error will print to stderr and highlight in red.
+	if [ "${EXIT_CODE}" != "0" ]; then
+		exec 1>&2
+		echo
+		echo "Usage: $0 [-h | --help]"
+		echo "  -h --help         : Shows this help."
+		echo
+		echo $COLOR_RED
+	fi
+	echo "${EXIT_MESSAGE}"
+	echo ${COLOR_OFF}
+	exit ${EXIT_CODE}
+}
+
+#####################################################################
+# Global traps and aliases
+#####################################################################
+
+# Must set 'die' as an alias in order for LINENO to make sense.
+#shopt -s expand_aliases
+#alias die='echo -n "${COLOR_YEL}${0} at line ${LINENO}:${COLOR_OFF} "; exit_with_message'
+####
+####trap "die 1 'Received SIGHUP'" SIGHUP
+####trap "die 1 'Received SIGINT'" SIGINT
+####trap "die 1 'Received SIGTERM'" SIGTERM
+
+#####################################################################
+# MAIN
+#####################################################################
+
+while [ $# != 0 ]; do
+	if [ "-h" = "${1}" ]; then
+		exit_with_message 1 "Help"
+		# Should not get here
+		exit 2
+	elif [ "--help" = "${1}" ]; then
+		exit_with_message 1 "Help"
+		# Should not get here
+		exit 2
+	else
+		FILENAME=${1}
+		shift
+	fi
+done
+
+#
+# Cleanup the filename and figure out the extension.
+#
+FILENAME_CANONICAL=$(canonical "${FILENAME}")
+if [ -z ${FILENAME##*/} ]; then
+	FILENAME_CANONICAL=${FILENAME_CANONICAL}/
+fi
+DIRNAME=${FILENAME_CANONICAL%/*}
+FILENAME=${FILENAME_CANONICAL#${DIRNAME}/}
+FILENAME_WITHOUT_EXT=${FILENAME%%.*}
+FILE_EXT=${FILENAME#*.}
+if [ ${FILE_EXT} = ${FILENAME} ]; then
+	FILE_EXT=""
+else
+	FILE_EXT=.${FILE_EXT}
+fi
+
+#
+# Check the the destination file and directory exists.
+#
+if [ ! -w ${DIRNAME} ]; then
+	msg="ERROR: no write permission on directory.\n"
+	msg=${msg}"Write permission must be granted on ${DIRNAME} to rename files."
+	exit_with_message 1 ${msg}
+fi
+if [ ! -f ${FILENAME_CANONICAL} ]; then
+	msg="ERROR: file does not exist\n"
+	msg=${msg}"The following file must exist: ${FILENAME_CANONICAL}."
+	exit_with_message 1 "${msg}"
+fi
+
+#
+# Loop through the files and rename the index numbers.
+#
+RUNNING=1
+index=1
+filename_curr=${DIRNAME}/${FILENAME_WITHOUT_EXT}${FILE_EXT}
+mv ${filename_curr} ${filename_curr}.old
+filename_next=${DIRNAME}/${FILENAME_WITHOUT_EXT}.${index}${FILE_EXT}
+while [ ${RUNNING} -eq 1 ] ; do
+	if [ -f ${filename_next} ]; then
+		mv ${filename_next} ${filename_next}.old
+	else
+		RUNNING=0
+	fi
+	if [ -f ${filename_curr}.old ]; then
+		mv ${filename_curr}.old ${filename_next}
+	fi
+	filename_curr=${DIRNAME}/${FILENAME_WITHOUT_EXT}.${index}${FILE_EXT}
+	index=$((index+1))
+	filename_next=${DIRNAME}/${FILENAME_WITHOUT_EXT}.${index}${FILE_EXT}
+done
+
+#####################################################################
+# END
+#########1#########2#########3#########4#########5#########6#########7
+# vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'

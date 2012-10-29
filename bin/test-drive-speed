@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# test-drive-speed
+#
+# DESCRIPTION
+#
+#     This performs a very simple drive speed test. It measures sustained
+#     write and read speed to a 256 MB file.
+#
+# AUTHOR
+#
+#     Noah Spurrier <noah@noah.org>
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible.
+#     This license identical to the ISC License and is registered with and
+#     approved by the Open Source Initiative. For more information vist:
+#         http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c) 2010, Noah Spurrier <noah@noah.org>
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# VERSION
+#
+#     Version 1
+#
+
+# For a 128 MB file use BLOCK_COUNT=16 and BLOCK_SIZE=8388608.
+# For a 256 MB file use BLOCK_COUNT=32 and BLOCK_SIZE=8388608.
+BLOCK_COUNT=32
+BLOCK_SIZE=8388608
+OUTPUT_FILE="junk.bin"
+
+sync
+echo "uptime: $(uptime)"
+PWD=$(pwd)
+echo "current directory: ${PWD}"
+CURRENT_DEV=$(df -hT $(pwd) \
+ | sed -n -e 's/^\(\/dev\/[^[:space:]]\+\).*/\1/p')
+if [ "${CURRENT_DEV}" = "" ]; then
+  echo "WARNING: Did not find device associated with current directory."
+else
+  echo "mount device: ${CURRENT_DEV}"
+  echo "drive mount options: $(grep ${CURRENT_DEV} /etc/mtab)"
+  if grep ${CURRENT_DEV} /etc/mtab | grep -iq sync; then
+    echo "    WARNING: sync option will effect write speed tests."
+  fi
+  if echo ${CURRENT_DEV} | grep -q /dev/md; then
+    echo "    This device is a sofware RAID configured as follows:"
+    echo -en "        "
+    egrep 'md[0-9]+' /proc/mdstat
+    CURRENT_DEV=$(egrep 'md[0-9]+' /proc/mdstat \
+      |sed -n -e 's/.*[[:space:]]\([a-z]*[0-9]*\)\[.\]$/\1/p')
+    CURRENT_DEV="/dev/${CURRENT_DEV}"
+    echo "    Drive info will be taken from last device in the array."
+  fi
+  # Try `hdparm` otherwise try `lsusb`.
+  if ! DRIVE_INFO=$(hdparm -I ${CURRENT_DEV} | sed -n -e '/^$/d' \
+    -e '0,/Standards:/p' | sed -n -e '$!p'); then
+    DRIVE_INFO=$(lsusb)
+  fi
+  DRIVE_INFO=$(echo ${DRIVE_INFO})
+  echo "drive info: ${DRIVE_INFO}"
+fi
+echo
+echo "Running test three times..."
+for n in 1 2 3; do
+  echo -n "test ${n}: "
+  sync
+  dd if=/dev/zero of=${OUTPUT_FILE} oflag=dsync conv=fdatasync \
+    bs=${BLOCK_SIZE} count=${BLOCK_COUNT} 2>&1|grep "copied"|cut -f1,6 -d" " \
+    |awk '{printf("write: %7.2f MB/s, ",$1/$2/(1024*1024))}'
+  sync
+  dd if=${OUTPUT_FILE} iflag=direct conv=fdatasync of=/dev/null \
+    bs=${BLOCK_SIZE} count=${BLOCK_COUNT} 2>&1|grep "copied"|cut -f1,6 -d" " \
+    |awk '{printf("read:  %7.2f MB/s\n",$1/$2/(1024*1024))}'
+  rm junk.bin
+done
+# vim:set ft=sh sr et ts=2 sw=2: // See Vim, :help 'modeline'

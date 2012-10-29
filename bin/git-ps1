@@ -1,0 +1,246 @@
+#!/bin/bash
+
+# When under a git repository this script adds the bash prompt indicators about
+# the repository status.
+#
+# the status includes the current branch and colored circles that have the
+# following meaning:
+# Green: there are staged changes,
+# Yellow: if there are unstaged changes
+# Red: if there are new untracked-yet-unignored files
+#
+# The idea for this script came from:
+# http://briancarper.net/blog/570/git-info-in-your-zsh-prompt
+#
+# Author: Daniel Chcouri <333222@gmail.com>; http://www.blogy.me/
+# License: GPL2
+
+# Colors definitions
+black=$(tput setaf 0)
+bold_black=$(tput setaf 0; tput bold)
+red=$(tput setaf 1)
+bold_red=$(tput setaf 1; tput bold)
+green=$(tput setaf 2)
+bold_green=$(tput setaf 2; tput bold)
+yellow=$(tput setaf 3)
+bold_yellow=$(tput setaf 3; tput bold)
+blue=$(tput setaf 4)
+bold_blue=$(tput setaf 4; tput bold)
+magenta=$(tput setaf 5)
+bold_magenta=$(tput setaf 5; tput bold)
+cyan=$(tput setaf 6)
+bold_cyan=$(tput setaf 6; tput bold)
+white=$(tput setaf 7)
+bold_white=$(tput setaf 7; tput bold)
+
+reset_colors=$(tput sgr0)
+
+# git.is_rep(path=".")
+#
+# Gets a path and returns 0 if it's under a git repository; 1 otherwise
+#
+# If under git repository it prints the path to the .git dir to stdout
+# function current_branch() {
+#   ref=$(git symbolic-ref HEAD 2> /dev/null) || return
+#   echo ${ref#refs/heads/}
+# }
+git.is_rep ()
+{
+    local path="${1:-.}"
+
+    # First, get the path's absolute path
+    cd "$path"
+    path="$(pwd -P)/"
+    cd - > /dev/null
+
+    while [[ "$path" != '' ]]
+    do
+        if [[ -e "${path}.git" ]]
+        then
+            echo "${path}.git"
+            return 0
+        fi
+
+        if [[ "$path" == '/' ]]
+        then
+            return 1
+        else
+            path="${path%/*/}/"
+        fi
+    done
+}
+
+# git.current_branch()
+#
+# echo the current git branch
+#
+# return 1 if not under a git repository, 2 if branch is detached or unknown
+git.current_branch ()
+{
+    local dot_git_path branch
+
+    if ! dot_git_path="$(git.is_rep)"
+    then
+        return 1
+    fi
+
+    # The following was forked from:
+    # http://aaroncrane.co.uk/2009/03/git_branch_prompt/
+    head=$(< "$dot_git_path/HEAD")
+    if [[ $head == ref:\ refs/heads/* ]]; then
+        branch="${head#*/*/}"
+        echo "$branch"
+        return 0
+    elif [[ $head != '' ]]; then
+        branch='detached'
+        echo "$branch"
+        return 2
+    else
+        branch='unknown'
+        echo "$branch"
+        return 2
+    fi
+}
+
+# git.current_branch()
+#
+# return a list of space-separated booleans that represent the current git
+# status
+#
+# Meaning of each position:
+# 0 untracked
+# 1 updated in index
+# 2 added to index
+# 3 deleted from index
+# 4 renamed in index
+# 5 copied in index
+# 6 work tree changed since index
+# 7 deleted in work tree
+# 8 unmerged, both deleted
+# 9 unmerged, added by us
+# 10 unmerged, deleted by them
+# 11 unmerged, added by them
+# 12 unmerged, deleted by us
+# 13 unmerged, both added
+# 14 unmerged, both modified
+git.status ()
+{
+    local index="$(git status --porcelain 2> /dev/null)"
+
+    local flags=( 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 )
+
+    while IFS= read -r line; do
+        case "${line:0:1}"
+        in
+            # untracked
+            "?")
+                flags[0]=1
+            ;;
+            # updated in index
+            "M")
+                flags[1]=1
+            ;;
+            # added to index
+            "A")
+                flags[2]=1
+            ;;
+            # deleted from index
+            "D")
+                flags[3]=1
+            ;;
+            # renamed in index
+            "R")
+                flags[4]=1
+            ;;
+            # copied in index
+            "D")
+                flags[5]=1
+            ;;
+        esac
+        case "${line:1:1}"
+        in
+            # work tree changed since index
+            "M")
+                flags[6]=1
+            ;;
+            # deleted in work tree
+            "D")
+                flags[7]=1
+            ;;
+        esac
+        case "${line:0:2}"
+        in
+            # unmerged, both deleted
+            "DD")
+                flags[8]=1
+            ;;
+            # unmerged, added by us
+            "AU")
+                flags[9]=1
+            ;;
+            # unmerged, deleted by them
+            "UD")
+                flags[10]=1
+            ;;
+            # unmerged, added by them
+            "UA")
+                flags[11]=1
+            ;;
+            # unmerged, deleted by us
+            "DU")
+                flags[12]=1
+            ;;
+            # unmerged, both added
+            "AA")
+                flags[13]=1
+            ;;
+            # unmerged, both modified
+            "UU")
+                flags[14]=1
+            ;;
+        esac
+    done <<< "$index"
+
+    echo "${flags[@]}"
+
+    return 0
+}
+
+prompt_command_git_status ()
+{
+    local result="$bold_blue$(git.current_branch)"
+    local status=($(git.status))
+
+    if (( ${status[1]} == 1 )) || (( ${status[2]} == 2 )) || (( ${status[3]} == 3 )) || (( ${status[4]} == 4 )) || (( ${status[5]} == 5 ))
+    then
+        #echo "staged changes"
+        result+="$bold_green●$reset_colors"
+    fi
+    if (( ${status[6]} == 1 )) || (( ${status[7]} == 1 ))
+    then
+        #echo "unstaged changes"
+        result+="$bold_yellow●$reset_colors"
+    fi
+    if (( ${status[0]} == 1 ))
+    then
+        #echo "untracked changes"
+        result+="$bold_red●$reset_colors"
+    fi
+
+    echo "$result"
+}
+
+
+export original_ps="$PS1"
+PROMPT_COMMAND+="$(cat <<EOF
+
+    if git.is_rep > /dev/null
+    then
+        export PS1="$bold_green\u@\h $bold_blue\W [$reset_colors\$(prompt_command_git_status)$bold_blue] \$ $reset_colors"
+    else
+        export PS1="\$original_ps"
+    fi
+EOF
+)"
+
+# vim:ft=bash:
