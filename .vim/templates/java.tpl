@@ -128,4 +128,4 @@ public class TODO_shell
     }
 }
 
-// vim:set sr et ts=4 sw=4 ft=java: // See Vim, :help 'modeline'
+// vim: set ft=java sr et ts=4 sw=4 : See help 'modeline'

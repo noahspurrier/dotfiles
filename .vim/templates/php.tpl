@@ -20,7 +20,5 @@
  * On this notice these rights rely.
  */
 
-
-
-// vim:set sr et ts=4 sw=4 ft=php: // See Vim, :help 'modeline'
+// vim: set ft=php sr et ts=4 sw=4 : See help 'modeline'
 ?>

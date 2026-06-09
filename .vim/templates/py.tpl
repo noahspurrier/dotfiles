@@ -1,39 +1,38 @@
 #!/usr/bin/env python
-# vim:set ft=python fileencoding=utf-8 sr et ts=4 sw=4 : See help 'modeline'
 
-"""
+'''
 SYNOPSIS
 
-    TODO: helloworld [-h,--help] [-v,--verbose] [--version]
+    TODO helloworld [-h,--help] [-v,--verbose] [--version]
 
 DESCRIPTION
 
-    TODO: This describes how to use this script.
+    TODO This describes how to use this script.
     This docstring will be printed by the script if there is an error or
     if the user requests help (-h or --help).
 
 EXAMPLES
 
-    TODO: The following are some examples of how to use this script.
+    TODO The following are some examples of how to use this script.
     $ helloworld --version
     1
 
 EXIT STATUS
 
-    TODO: This exits with status 0 on success and 1 otherwise.
+    TODO This exits with status 0 on success and 1 otherwise.
     This exits with a status greater than 1 if there was an
     unexpected run-time error.
 
 AUTHOR
 
-    TODO: Name <name@example.org>
+    TODO Noah Spurrier <noah@noah.org>
 
 LICENSE
 
     This license is approved by the OSI and FSF as GPL-compatible.
         http://opensource.org/licenses/isc-license.txt
 
-    TODO: Copyright (c) 4-digit year, Company or Person's Name
+    TODO Copyright (c) 2019, Noah Spurrier <noah@noah.org>
     PERMISSION TO USE, COPY, MODIFY, AND/OR DISTRIBUTE THIS SOFTWARE FOR ANY
     PURPOSE WITH OR WITHOUT FEE IS HEREBY GRANTED, PROVIDED THAT THE ABOVE
     COPYRIGHT NOTICE AND THIS PERMISSION NOTICE APPEAR IN ALL COPIES.
@@ -47,12 +46,12 @@ LICENSE
 
 VERSION
 
-    TODO: Version 1
-"""
+    TODO Version 1
+'''
 
-__version__ = 'TODO: Version 1'
-__date__ = 'TODO: date'
-__author__ = 'TODO: Name <name@example.org>'
+__version__ = 'TODO Version 1'
+__date__ = 'TODO date'
+__author__ = 'TODO Noah Spurrier <noah@noah.org>'
 
 import sys
 import os
@@ -65,7 +64,7 @@ import logging
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger(__name__)
 if os.getenv('PYTHONLOGGING') in logging._levelNames:
-    logger.setLevel (logging._levelNames[os.getenv('PYTHONLOGGING')])
+    logger.setLevel(logging._levelNames[os.getenv('PYTHONLOGGING')])
 
 # Uncomment the following section if you want readline history support.
 #import readline, atexit
@@ -76,43 +75,68 @@ if os.getenv('PYTHONLOGGING') in logging._levelNames:
 #    pass
 #atexit.register(readline.write_history_file, histfile)
 
-def main (options=None, args=None):
 
-    # TODO: Do something more interesting here...
+def main(options=None, args=None):
+
+    # TODO Do something more interesting here...
     sys.stdout.flush()
-    sys.stdout.write ("\033[2J") # ED: clear screen
-    sys.stdout.write ("\033[1;1H") # CUP: cursor home (row 1, col 1)
-    sys.stdout.write ("\033[1G") # CHA: cursor to column 1
+    sys.stdout.write("\033[2J") # ED: clear screen
+    sys.stdout.write("\033[1;1H") # CUP: cursor home (row 1, col 1)
+    sys.stdout.write("\033[1G") # CHA: cursor to column 1
     print('Hello world!')
+
 
 if __name__ == '__main__':
     try:
         start_time = time.time()
-        # TODO: set version here.
+        # TODO set version here.
         parser = optparse.OptionParser(
-                formatter=optparse.TitledHelpFormatter(),
-                usage=globals()['__doc__'],
-                version='TODO')
+            formatter=optparse.TitledHelpFormatter(),
+            usage=globals()['__doc__'],
+            version='TODO'
+        )
+        parser.add_option('--intoption', type='int',
+                          default=1024, help='example int option with default')
         parser.add_option('-v', '--verbose', action='store_true',
-                default=False, help='verbose output')
+                          default=False, help='verbose output')
         (options, args) = parser.parse_args()
         #if len(args) < 1:
         #    parser.error ('missing argument')
-        if options.verbose: print(time.asctime())
+        if options.verbose:
+            print(time.asctime())
         exit_code = main(options, args)
         if exit_code is None:
             exit_code = 0
         if options.verbose:
-            print (time.asctime())
-            print ('TOTAL TIME IN MINUTES: %f'%((time.time()-start_time)/60.0))
+            print(time.asctime())
+            print('TOTAL TIME IN MINUTES: %f' %
+                  ((time.time() - start_time) / 60.0))
         sys.exit(exit_code)
-    except KeyboardInterrupt as e: # The user pressed Ctrl-C.
+    except KeyboardInterrupt as e:
+        # The user pressed Ctrl-C.
         raise e
-    except SystemExit as e: # The script called sys.exit() somewhere.
+    except SystemExit as e:
+        # The script called sys.exit() somewhere.
         raise e
     except Exception as e:
-        print ('ERROR: Unexpected Exception')
-        print (str(e))
+        print('ERROR: Unexpected Exception')
+        print(str(e))
         traceback.print_exc()
         os._exit(2)
 
+#
+#  __________________            _-_
+#  \___=NCC-1701= __))  ____.---'---`---.____
+#              \_ \     \----._________.----'
+#                \ \     / /    `-_-'
+#            __,--`-`---'-'-.
+#           /}___           ){-
+#                `--.____,-'
+#
+#       __Q-_            _______====-
+#      {====---=========/_____    /___
+#       `----'          `---- `\___, /
+#                             _/___/_____
+#                            <__________|}
+#
+# vim: set ft=python fileencoding=utf-8 sr et ts=4 sw=4 : See help 'modeline'
