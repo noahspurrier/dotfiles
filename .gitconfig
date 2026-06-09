@@ -14,8 +14,10 @@
     # See also https://git.wiki.kernel.org/index.php/Aliases
     retrack = "!retrack() { git config \"branch.$1.remote\" $(dirname \"$2\"); git config \"branch.$1.merge\" \"refs/heads/$(basename \"$2\")\"; }; retrack"
 ###     graph = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
-    graph = log --graph --pretty='format:%h,%ci,%d, %s <%ae>'
+    graph = log --graph --color=auto --pretty='%C(auto) %h %ci %an %s'
     ll = log --name-status
+    unadd = reset HEAD
+    unstage = reset HEAD
 
 ###     # thanks to zach wily, this is for pushing reviews to gerrit
 ###     push-change = "!bash -c ' \
@@ -86,8 +88,14 @@
     # This sets pull to default to `git pull --rebase`.
     autosetuprebase = always
 
+[pull]
+    pull = pull --ff-only
+
 [push]
 # The following only works on newer versions of git.
 # It's similar to setting the default to upstream.
 #    default = simple
     default = upstream
+[user]
+	name = Noah Spurrier
+	email = noah@noah.org

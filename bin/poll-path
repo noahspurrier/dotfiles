@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+# vim:set ft=python fileencoding=utf-8 sr et ts=4 sw=4 : See help 'modeline'
+
+import sys
+import os
+import time
+
+
+def poll_path(target_path='.', timeout=10, idle_time=0.250,
+              settle_time=0.100):
+
+    timeout_mark = time.time() + timeout
+    before_timestamp = os.stat(target_path).st_mtime
+    before_list = os.listdir(target_path)
+    while True:
+        time.sleep(idle_time)
+        after_timestamp = os.stat(target_path).st_mtime
+        if after_timestamp != before_timestamp:
+            break
+        if time.time() > timeout_mark:
+            return None
+    time.sleep(settle_time)
+    after_list = os.listdir(target_path)
+    new_files = [ii for ii in after_list if ii not in before_list]
+    old_files = [ii for ii in before_list if ii not in after_list]
+    return new_files, old_files
+
+if __name__ == '__main__':
+
+    changes = poll_path()
+    if changes is None:
+        sys.exit(1)
+    print ("+%s" % str(changes[0]))
+    print ("-%s" % str(changes[1]))
+####    try:
+####        start_time = time.time()
+####        # TODO: set version here.
+####        parser = optparse.OptionParser(
+####                formatter=optparse.TitledHelpFormatter(),
+####                usage=globals()['__doc__'],
+####                version='TODO')
+####        parser.add_option('-v', '--verbose', action='store_true',
+####                default=False, help='verbose output')
+####        (options, args) = parser.parse_args()
+####        #if len(args) < 1:
+####        #    parser.error ('missing argument')
+####        if options.verbose: print(time.asctime())
+####        exit_code = main(options, args)
+####        if exit_code is None:
+####            exit_code = 0
+####        if options.verbose:
+####            print (time.asctime())
+####            print ('TIME IN MINUTES: %f'%((time.time()-start_time)/60.0))
+####        sys.exit(exit_code)
+####    except KeyboardInterrupt as e: # The user pressed Ctrl-C.
+####        raise e
+####    except SystemExit as e: # The script called sys.exit() somewhere.
+####        raise e
+####    except Exception as e:
+####        print ('ERROR: Unexpected Exception')
+####        print (str(e))
+####        traceback.print_exc()
+####        os._exit(2)

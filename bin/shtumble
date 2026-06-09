@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # shtumble --
 # a wireless network stumbler and configuration tool, written in bash.

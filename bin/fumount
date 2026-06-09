@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Originally from: http://devresources.linux-foundation.org/dev/fumount/script/fumount
 # TODO: accept either dir or device on command line (like umount does)

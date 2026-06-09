@@ -8,6 +8,10 @@
 ! a brief summary of the field codes used in font names.
 ! Run the `xlsfonts` command to see available fonts.
 ! Run the `xfonsel` command to select a font name.
+! To see current aliases find fonts.alias usually located here:
+! /usr/share/fonts/X11/misc/fonts.alias. See also the command
+! update-fonts-alias.
+!
 !
 ! An asterisk (*) means "loose binding" (like a wild-card).
 ! A period (.) means a "tight binding". A loose binding means that
@@ -107,4 +111,4 @@ gnuplot*persist: on
 !   fixed    | -misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1
 !   6x13bold | -misc-fixed-bold-r-semicondensed--13-120-75-75-c-60-iso8859-1
 !   7x13     | -misc-fixed-medium-r-normal--13-120-75-75-c-70-iso8859-1
-
+!   12x24    |

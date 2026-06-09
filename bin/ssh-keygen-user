@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# This is a script. This script is the documentation. To read the
+# documentation, simply read the script. This script. The one you're reading.
+# See? You're doing it. You're reading the documentation.
+#
+# Example
+#     ssh-keygen-user peterparker
+# Generates the following:
+#     ~/peterparker.ssh/id_rsa
+#     ~/peterparker.ssh/id_rsa.pub
+#
+# Options
+#
+# Pass username as the first argument; otherwise, 'noah' is assumed.
+USERNAME=${1:-noah}
+
+echo "# Initialize key directory, files, and permissions."
+mkdir ~/${USERNAME}.ssh
+chmod 700 ~/${USERNAME}.ssh
+ssh-keygen -q -N '' -f ~/${USERNAME}.ssh/id_rsa
+chmod 600 ~/${USERNAME}.ssh/id_rsa
+chmod 644 ~/${USERNAME}.ssh/id_rsa.pub
+
+echo
+echo "# MANUAL STEP: Someone needs to copy ~/${USERNAME}.ssh/ to remote host."
+echo "# MANUAL STEP: Then someone needs to append this to the appropriate"
+echo "# authorized_keys file."
+echo
+echo "# Example connection command that should now work:"
+echo "ssh -i ~/${USERNAME}.ssh/id_rsa ${USERNAME}@example.com"

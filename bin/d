@@ -1,0 +1,177 @@
+#!/usr/bin/env python
+
+"""
+SYNOPSIS
+
+    d [-h] [-v,--verbose] [--version]
+
+DESCRIPTION
+
+    This is uses Tk to display PIL Image objects. The advantage of this over
+    using Image.show() is that it will reuse the same window, so you can show
+    multiple images without opening a new window for each image.
+
+    This will simply go through each file in the current directory and
+    try to display it. If the file is not an image then it will be skipped.
+    Click on the image display window to go to the next image.
+
+DEPENDENCIES
+
+    Requires Tk and PIL. On Ubuntu install the following packages:
+    python-tk, python-imaging, python-imaging-tk
+
+AUTHOR
+
+    Noah Spurrier <noah@noah.org>
+
+LICENSE
+
+    This script is in the public domain, free from copyrights or restrictions.
+
+VERSION
+
+    $Id: d 249 2008-05-05 02:16:28Z noah $
+"""
+
+import sys, os, traceback, optparse, time, threading
+import Tkinter, Image, ImageTk
+
+class Displayer :
+
+    def __init__ (self):
+
+        self.old_label_image = None # Used for garbage collection.
+        self.event = None # The last event seen.
+        self.root = Tkinter.Tk()
+        self.root.bind("<Button-1>", self.quit_on_event)
+        self.root.bind("<Button-3>", self.quit_on_event)
+        self.root.bind("<Key-q>", self.quit_on_event)
+        self.root.bind("<Key-space>", self.quit_on_event)
+        self.root.geometry('+%d+%d' % (100,100))
+
+    def display_image (self, filename):
+
+        image = Image.open(filename)
+        self.root.geometry('%dx%d' % (image.size[0],image.size[1]))
+        tkpi = ImageTk.PhotoImage(image)
+        label_image = Tkinter.Label(self.root, image=tkpi)
+        label_image.place(x=0,y=0,width=image.size[0],height=image.size[1])
+        self.root.title(filename)
+        # manually destroy old image to avoid memory leak
+        if self.old_label_image is not None:
+            self.old_label_image.destroy()
+        self.old_label_image = label_image
+        self.root.mainloop()
+        return self.event
+
+#    def mainloop (self):
+#
+#        self.root.update()
+#        self.root.mainloop()
+#        return self.event
+
+    def quit_on_event (self, event):
+
+        self.event = event
+        event.widget.quit()
+
+#    def key_f5_reload (self, event):
+#        event.widget.
+class FileWatcher (threading.Thread):
+
+    def __init__ (self, filename, event_callback = None, poll_interval = 3):
+
+        threading.Thread.__init__(self)
+        self.filename = filename
+        self.poll_interval = poll_interval
+        self.event_callback = event_callback
+        self.finished = threading.Event()
+
+    def run (self):
+
+        try:
+            original_mtime = os.stat(self.filename).st_mtime
+            while not self.finished.isSet():
+                self.finished.wait(self.poll_interval)
+                print "run"
+                current_mtime = os.stat(self.filename).st_mtime
+                if current_mtime != original_mtime:
+                    self.stop()
+                    if self.event_callback is not None:
+                        self.event_callback()
+        except OSError, e:
+            self.stop()
+
+    def stop (self):
+
+        self.finished.set()
+        self.join()
+
+
+def mtime_event ():
+    global d
+    print "file_changed"
+    d.root.generate_event('q')
+
+d = None
+def main ():
+
+    global options, args, d
+
+    if len(args) > 0:
+        file_list = args
+    else:
+        file_list = os.listdir('.')
+
+    d = Displayer()
+
+    i = 0
+    while True:
+        filename = file_list[i]
+
+        try:
+            foo = FileWatcher (filename, mtime_event, 1)
+            foo.start()
+            event = d.display_image (filename)
+
+            if event.type == '2': # KeyPress
+                if event.char == 'q':
+                    break
+                elif event.char == ' ':
+                    continue # just causes a reload
+
+            if event.type == '4': # ButtonPress
+                if event.num == 1:
+                    i = i + 1
+                elif event.num == 3:
+                    i = i - 1
+                if i >= len(file_list):
+                    i = len(file_list) - 1
+                if i < 0:
+                    i = 0
+        except Exception, e:
+            pass
+
+if __name__ == '__main__':
+    try:
+        start_time = time.time()
+        parser = optparse.OptionParser(formatter=optparse.TitledHelpFormatter(), usage=globals()['__doc__'], version='$Id: d 249 2008-05-05 02:16:28Z noah $')
+        parser.add_option ('-v', '--verbose', action='store_true', default=False, help='verbose output')
+        (options, args) = parser.parse_args()
+        #if len(args) < 1:
+        #    parser.error ('missing argument')
+        if options.verbose: print time.asctime()
+        main()
+        if options.verbose: print time.asctime()
+        if options.verbose: print 'TOTAL TIME IN MINUTES:',
+        if options.verbose: print (time.time() - start_time) / 60.0
+        sys.exit(0)
+    except KeyboardInterrupt, e: # Ctrl-C
+        raise e
+    except SystemExit, e: # sys.exit()
+        raise e
+    except Exception, e:
+        print 'ERROR, UNEXPECTED EXCEPTION'
+        print str(e)
+        traceback.print_exc()
+        os._exit(1)

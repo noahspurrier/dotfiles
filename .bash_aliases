@@ -10,26 +10,29 @@
 #                (alias, keyword, function, builtin, file).
 
 unalias -a
-alias ls='ls $LS_OPTIONS'
+alias ls='ls ${LS_OPTIONS}'
 # This adds octal permissions to `ls` output. This does not handle setuid, setgid, and sticky bits.
-alias l='ls $LS_OPTIONS --color -la | awk "{k=0;for(i=0;i<=8;i++)k+=((substr(\$1,i+2,1)~/[rwx]/)*2^(8-i));if(k)printf(\"%0o \",k);print}"'
-alias ll='ls $LS_OPTIONS -lab --file-type'
-alias lm='ls -am'
-alias lld='ls -lad */'
-alias latr='ls $LS_OPTIONS -latrF'
-#alias l='ls $LS_OPTIONS -la|grep --color=never ^d;ls $LS_OPTIONS -la|grep --color=never -v ^d'
-#alias l='ls $LS_OPTIONS -la|grep ^d;ls $LS_OPTIONS -la|grep -v ^d'
+alias l='ls ${LS_OPTIONS} --color -la | awk "{k=0;for(i=0;i<=8;i++)k+=((substr(\$1,i+2,1)~/[rwx]/)*2^(8-i));if(k)printf(\"%0o \",k);print}"'
+alias ll='ls ${LS_OPTIONS} -lap'
+#alias lm='ls -am'
+alias lld='ls -lad .*/ */'
+alias latr='ls ${LS_OPTIONS} -latrF'
+# This adds OSX extended attributes and user ACL to `ls` output.
+alias lsx='ls -laOe@'
+#alias l='ls ${LS_OPTIONS} -la|grep --color=never ^d;ls ${LS_OPTIONS} -la|grep --color=never -v ^d'
+#alias l='ls ${LS_OPTIONS} -la|grep ^d;ls ${LS_OPTIONS} -la|grep -v ^d'
 alias ..='cd ..'
 # Like `cd` but if a filename is given then this will cd into the directory
 # that holds the file. This is helpful when cutting and pasting filenames
 # to cd into. This avoids the nuisance where you cut and paste a filename
 # with a path and then have to delete the filename portion to cd into.
-cdf () {
-        if [ -d "$1" ]; then
-                cd "$1";
-        else
-                cd $(dirname "$1");
-        fi;
+cdf ()
+{
+    if [ -d "$1" ]; then
+        cd "$1"
+    else
+        cd $(dirname "$1")
+    fi
 }
 alias pd='pushd'
 alias fd='pushd'
@@ -39,12 +42,12 @@ alias df='df -hT'
 alias lspcil='lspci -v -b -k -nn -D'
 alias lspcit='lspci -v -b -k -nn -t'
 alias cmi='./configure && make && make install'
+alias nping='ping -p 4E4F4148'
 alias h='history 200'
-alias nohist='set +o history'
-alias delhist='set +o history;history -c;history -w;clear'
 alias shred='shred --iterations=1'
 alias j='jobs -l'
 alias c='clear'
+alias issh='ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'
 # show the devices modified in the last 5 minutes.
 alias lastdevs='find /dev -mmin -5 -maxdepth 2'
 # This adds "god mode" -- an homage to Doom. Hopefully I don't perform my
@@ -52,8 +55,13 @@ alias lastdevs='find /dev -mmin -5 -maxdepth 2'
 # wrapper around su that adds X Window forwarding. It's easy to find.
 alias god='if which sux >/dev/null ; then sudo `which sux` - ; elif which sudo >/dev/null ; then sudo `which su` - ; else su - ; fi'
 alias root='if which sux >/dev/null ; then sudo `which sux` - ; elif which sudo >/dev/null ; then sudo `which su` - ; else su - ; fi'
-# ps grep
-alias psg='ps axwwo pid,ppid,nice,pri,pcpu,pmem,stat,etime,user,command | grep -i -e "^[[:space:]]*PID" -e'
+# ps grep -- This is now a shell function.
+# Run 'ps L' to get a list of output specifiers.
+#alias psg='ps axHwwo pid,ppid,tid,nice,pri,pcpu,pmem,etime,user,wchan:20,stat,command | grep -i -e "^[[:space:]]*PID" -e'
+#alias psg='ps axwwo pid,ppid,nice,pri,pcpu,pmem,stat,etime,user,command | grep -i -e "^[[:space:]]*PID" -e'
+# The 'm' style thread view is a bit more redundant and makes it harder to
+# match by PID, so this could hide critical info. The 'H' style is better.
+#alias psg='ps axmwwo pid,ppid,tid,thcount,nice,pri,pcpu,pmem,etime,user,wchan:20,stat,command | grep -i -e "^[[:space:]]*PID" -e'
 alias sleepers='ps Haxwwo stat,pid,ppid,user,wchan:25,command | grep -e "^STAT" -e "^D" -e "^Z" -e "^S"'
 alias http-serve='python -m SimpleHTTPServer 8080'
 # history grep
@@ -72,9 +80,9 @@ alias vpndown='sudo kill -INT `cat ~/.openvpn/openvpn.pid`'
 alias ban='iptables -I INPUT -j DROP -s'
 alias unban='iptables -D INPUT -j DROP -s'
 alias netstat='netstat -p'
-alias listeners='netstat -nlp --protocol=inet'
-alias mtrr='mtr -n -r -c 5'
-alias suicide='kill -9 `ps --no-headers $$ | awk "{print $1}"`'
+alias listeners='netstat -apnut'
+alias mtrr='sudo mtr -b --mpls --report-wide -c 5 --order "LSRD N BWAVG JMXI"'
+alias suicide='kill -9 $$'
 alias bc='bc --mathlib --quiet'
 alias vba='vba -1 --auto-frameskip'
 alias gba='vba -1 --auto-frameskip'
@@ -89,29 +97,31 @@ alias logs='find /var/log -type f | grep -v -E -e '\''\.gz$'\'' -e '\''\.log\.[0
 #     -parenb: disable parity generation and detection
 #     -cstopb: Use one stop bit per character
 #      -hupcl: Do not hang up connection on last close
-serial () {
-        SPEED=${1}
-        SERIAL_DEVICE=${2:-GUESS}
-	if [ -z "${SPEED}" ]; then
-		echo "You must specify a speed."
-		echo "Common speeds are:"
-		echo "    300 9600 19200 38400 57600 115200"
-		return 1
-	fi
-	if [ "${SERIAL_DEVICE}" = "GUESS" ]; then
-		if [ -c /dev/ttyUSB0 ]; then
-			SERIAL_DEVICE=/dev/ttyUSB0
-		elif [ -c /dev/ttyS0 ]; then
-			SERIAL_DEVICE=/dev/ttyS0
-		else
-			echo "Could not find a serial device."
-			echo "Tried /dev/ttyUSB0 first, then /dev/ttyS0."
-			echo "Specify the serial device as the second option."
-			return 1
-		fi
-	fi
-        SCREEN_OPTS="${SERIAL_DEVICE} ${SPEED},cs8,parenb,-cstopb,-hupcl"
-        screen -t "${SCREEN_OPTS}" ${SCREEN_OPTS}
+serial ()
+{
+    SPEED=${1}
+    SERIAL_DEVICE=${2:-GUESS}
+    if [ -z "${SPEED}" ]; then
+        echo "You must specify a speed."
+        echo "Common speeds are:"
+        echo "    300 9600 19200 38400 57600 115200"
+        return 1
+    fi
+    if [ "${SERIAL_DEVICE}" = "GUESS" ]; then
+        if [ -c /dev/ttyUSB0 ]; then
+            SERIAL_DEVICE=/dev/ttyUSB0
+        elif [ -c /dev/ttyS0 ]; then
+            SERIAL_DEVICE=/dev/ttyS0
+        else
+            echo "Could not find a serial device."
+            echo "Tried /dev/ttyUSB0 first, then /dev/ttyS0."
+            echo "Specify the serial device as the second option."
+            return 1
+        fi
+    fi
+    # SCREEN_OPTS are a superset of 'stty' options.
+    SCREEN_OPTS="${SERIAL_DEVICE} ${SPEED},cs8,parenb,-cstopb,-hupcl"
+    screen -t "${SCREEN_OPTS}" ${SCREEN_OPTS}
 }
 alias serialwatch='watch -n 1 cat /proc/tty/driver/serial'
 alias test-drive-speed-old='dd if=/dev/zero of=test_data.bin oflag=dsync conv=fdatasync  bs=8388608 count=16 2>&1 | grep "bytes" | cut -f1,6 -d" " | awk '\''{printf ("write-speed: %7.2f MB/s, ", $1 / $2 / (1024*1024))}'\'' && dd if=test_data.bin iflag=direct conv=fdatasync of=/dev/null bs=8388608 count=16 2>&1 | grep "copied" | cut -f1,6 -d" " | awk '\''{printf ("read-speed:  %7.2f MB/s\n", $1 / $2 / (1024*1024))}'\'''
@@ -123,7 +133,11 @@ alias note="vim -c 'normal G' -c 'startinsert!' -c ':set paste' ~/`date "+note-%
 alias xr='xrdb -merge ~/.Xresources'
 alias mute='amixer set Master mute'
 alias pla='mplayer -af volnorm=2'
-alias jpegs2mpeg='mencoder "mf://*.jpg" -mf fps=25 -ovc lavc -lavcopts vcodec=mpeg4 -o '
+# Should just have a script like, "play *.jpg 30"
+alias playjpg='mplayer "mf://*.jpg" -mf fps=30 -loop 0'
+alias playpng='mplayer "mf://*.png" -mf fps=30 -loop 0'
+alias jpeg2mpeg='mencoder "mf://*.jpg" -mf fps=30 -ovc lavc -lavcopts vcodec=mpeg4 -o '
+alias png2mpeg='mencoder "mf://*.png" -mf fps=30 -ovc lavc -lavcopts vcodec=mpeg4 -o '
 # For Mac OSX put in .bashrc_local:
 # alias pla='/Applications/VLC.app/Contents/MacOS/VLC'
 alias im='centerim -a'
@@ -159,51 +173,71 @@ alias saidar='saidar -c'
 #     declare -f
 #
 
-# Encrypt or decrypt a given file using AES encryption with ASCII encoding.
-enc () { openssl aes-256-cbc -a -e -salt -in "$1" -out "$1.aes"; }
-dec () { openssl aes-256-cbc -a -d -in "$1" -out "${1%%.aes}"; }
+# Encrypt/decrypt a given file using AES encryption with ASCII encoding.
+enc ()
+{
+    openssl aes-256-cbc -a -e -salt -in "$1" -out "$1.aes"
+}
+dec ()
+{
+    openssl aes-256-cbc -a -d -in "$1" -out "${1%%.aes}"
+}
 
 # SSH directly to an existing or new screen session.
-sshscreen () { ssh -t $* "screen -DR"; }
+sshscreen ()
+{
+    ssh -t $* "screen -DR"
+}
 
 # Start VNC Viewer with a tunnel to REMOTE_HOST.
 # This assumes VNC Server is running on REMOTE_HOST.
 # Usage: sshvnc username@REMOTE_HOST port
-sshvnc () {
-    local HOST=$1; local PORT=$2;
-    if [ ${PORT-0} -lt 10 ]; then PORT=`expr $PORT + 5900`; fi;
+sshvnc ()
+{
+    local HOST=$1
+    local PORT=$2
+    if [ ${PORT-0} -lt 10 ]; then
+        PORT=$(expr $PORT + 5900)
+    fi
     ssh -f -N -q -L ${PORT}:127.0.0.1:${PORT} ${HOST}
-    vncviewer 127.0.0.1:${PORT}:0;
+    vncviewer 127.0.0.1:${PORT}:0
 } 
 
 ###############################################################################
 # This allows a screen session to do X11 and SSH auth forwarding.
 # See http://www.jukie.net/~bart/conf/zsh.d/S51_screen
 #
-##_ssh_auth_save() { ln -sf "$SSH_AUTH_SOCK" "$HOME/.screen/ssh-auth-sock.$HOSTNAME" }
+##_ssh_auth_save ()
+##{
+##    ln -sf "$SSH_AUTH_SOCK" "$HOME/.screen/ssh-auth-sock.$HOSTNAME"
+##}
 ##alias screen='_ssh_auth_save; export HOSTNAME=$(hostname); screen'
 [ -z "$HOSTNAME" ] && export HOSTNAME=$(hostname)
 # preserve the X environment variables
-store_display() {
+store_display ()
+{
     export | grep '\(DISPLAY\|XAUTHORITY\)=' > ~/.display.${HOSTNAME}
 }
 # read out the X environment variables
-update_display() {
+update_display ()
+{
     [ -r ~/.display.${HOSTNAME} ] && source ~/.display.${HOSTNAME}
 }
 # WINDOW is set when we are in a screen session
-if [ -n "$WINDOW" ] ; then 
+if [ -n "$WINDOW" ]; then
     # update the display variables right away
     update_display
 
     # setup the preexec function to update the variables before each command
-    preexec () {
+    preexec ()
+    {
         update_display
     }
 fi
 # reset the ssh-auth-sock link and screen display file before we run screen
-_screen_prep() {
-    if [ "$SSH_AUTH_SOCK" != "$HOME/.screen/ssh-auth-sock.$HOSTNAME" ] ; then
+_screen_prep ()
+{
+    if [ "$SSH_AUTH_SOCK" != "$HOME/.screen/ssh-auth-sock.$HOSTNAME" ]; then
         ln -fs "$SSH_AUTH_SOCK" "$HOME/.screen/ssh-auth-sock.$HOSTNAME"
     fi
     store_display
@@ -212,85 +246,86 @@ alias screen='_screen_prep ; screen'
 # End screen session forwarding for X11 and SSH Auth.
 ###############################################################################
 
-# Swap two filenames, if they exist (from Uzi's bashrc).
-function swap()
+xd ()
 {
-    local TMPFILE=tmp.$$
-
-    [ $# -ne 2 ] && echo "ERROR swap: 2 arguments needed" && return 1
-    [ ! -e $1 ] && echo "ERROR swap: $1 does not exist" && return 1
-    [ ! -e $2 ] && echo "ERROR swap: $2 does not exist" && return 1
-
-    mv "$1" $TMPFILE
-    mv "$2" "$1"
-    mv $TMPFILE "$2"
-}
-
-xd () {
     xxd -g 1 $1 | sed "n;n;n;n;n;n;n;n;n;n;n;n;n;n;n;a #"
 }
 alias hd='xd'
 
 # Dates and times
 # See also the script, date-rfc-3339.
-epoch () {
+epoch ()
+{
     date "+%s" "$@"
 }
 
-epoch-to-rfc-3339 () {
-    EPOCH=$(echo $@ | sed -n "s/.*\([0-9]\{10\}\).*/\1/p")
-    date "+%FT%T:::%z" -d "1970-01-01 UTC ${EPOCH} seconds"
+epochtorfc3339 ()
+{
+    RFC3339_FORMAT="+%FT%T:::%z"
+    EPOCH=$(echo $@ | sed -n "s/.*\([0-9]\{10\}\).*/\1/p");
+    if date --version >/dev/null 2>/dev/null; then
+        # Linux
+        date ${RFC3339_FORMAT} -d "1970-01-01 UTC ${EPOCH} seconds"
+        #date -d @${EPOCH} --rfc-3339=seconds
+    else
+        # OS X/BSD
+        date -r ${EPOCH} ${RFC3339_FORMAT}
+    fi
 }
 
 readc ()
 {
-	previous_stty=$(stty -g)
-	stty raw -echo
-	char=`dd bs=1 count=1 2>/dev/null`
-	stty "${previous_stty}"
-	if [ -n "$1" ] ; then
-		eval $1="${char}"
-	else
-		REPLY="${char}"
-	fi
+    previous_stty=$(stty -g)
+    stty raw -echo
+    char=$(dd bs=1 count=1 2>/dev/null)
+    stty "${previous_stty}"
+    if [ -n "$1" ]; then
+        eval $1="${char}"
+    else
+        REPLY="${char}"
+    fi
 }
 
 ruler ()
 {
-	for row in $(seq 24 -1 2); do
-		echo -n $row
-		if [ "${row}" != "2" ]; then
-			echo
-		fi
-	done
+    for row in $(seq 24 -1 2); do
+        echo -n $row
+        if [ "${row}" != "2" ]; then
+            echo
+        fi
+    done
 
-	echo -n "        1"
-	for decs in $(seq 2 8); do
-		echo -n "         ${decs}"
-	done
-	echo
+    echo -n "        1"
+    for decs in $(seq 2 8); do
+        echo -n "         ${decs}"
+    done
+    echo
 
-	for mult in $(seq 1 8); do
-		for col in $(seq 1 9); do
-			echo -n ${col}
-		done
-		echo -n 0
-	done
-	readc
-	echo
+    for mult in $(seq 1 8); do
+        for col in $(seq 1 9); do
+            echo -n ${col}
+        done
+        echo -n 0
+    done
+    readc
+    echo
 }
 
-one-random-dot()
+randomdot ()
 {
-	printf "\033[%d;%dH\033[7;9%dm \033[m" \
-		$((RANDOM%LINES+1)) \
-		$((RANDOM%COLUMNS+1)) \
-		$((RANDOM%8))
+    printf "\033[%d;%dH\033[7;9%dm \033[m" \
+        $((RANDOM%LINES+1)) \
+        $((RANDOM%COLUMNS+1)) \
+        $((RANDOM%8))
 }
 
-random-dots()
+randomdots ()
 {
-	clear;while :;do one-random-dot; sleep .001;done
+    clear
+    while :;do
+        randomdot
+        sleep .001
+    done
 }
 
 ramdisk ()
@@ -311,36 +346,82 @@ dircounts ()
 {
     cd "${1:-.}"
     for dp in *; do [ -d "${dp}" ] && echo $(find "${dp}"|wc -l) "$dp"; done | sort -n -b | column -t
-}
+    }
 
 # Similar to `dirsizes` but also recursively follows the biggest subpath.
-dirsizes-max ()
+dirsizesmax ()
 {
-	root_path="${1:-.}"
-	if [ -d "${root_path}" ]; then
-		biggest_subpath=$(cd "${root_path}"; du -ks * | sort -n -b | column -t | tail -n 1 )
-		echo ${biggest_subpath}
-		biggest_subpath="${biggest_subpath##* }"
-		export biggest_subpath=$(readlink -e "${root_path}/${biggest_subpath}")
-		if [ "${root_path}" != "${biggest_subpath}" ]; then
-			dirsizes-max "${biggest_subpath}"
-		fi
-	fi
+    root_path="${1:-.}"
+    if [ -d "${root_path}" ]; then
+        biggest_subpath=$(cd "${root_path}"; du -ks * | sort -n -b | column -t | tail -n 1 )
+        echo ${biggest_subpath}
+        biggest_subpath="${biggest_subpath##* }"
+        export biggest_subpath=$(readlink -e "${root_path}/${biggest_subpath}")
+        if [ "${root_path}" != "${biggest_subpath}" ]; then
+            dirsizesmax "${biggest_subpath}"
+        fi
+    fi
 }
 
 # Similar to `dircounts` but also recursively follows the biggest subpath.
-dircounts-max ()
-{
-	root_path="${1:-.}"
-	if [ -d "${root_path}" ]; then
-		biggest_subpath=$(cd "${root_path}"; for dp in *; do [ -d "${dp}" ] && echo $(find "${dp}"|wc -l) "${dp}"; done | sort -n -b | column -t | tail -n 1 )
-		echo "${biggest_subpath}"
-		biggest_subpath="${biggest_subpath##* }"
-		export biggest_subpath=$(readlink -e "${root_path}/${biggest_subpath}")
-		if [ "${root_path}" != "${biggest_subpath}" ]; then
-			dircounts-max "${biggest_subpath}"
-		fi
-	fi
+dircountsmax() {
+    root_path="${1:-.}"
+    if [ -d "${root_path}" ]; then
+        biggest_subpath=$(cd "${root_path}"; for dp in *; do [ -d "${dp}" ] && echo $(find "${dp}"|wc -l) "${dp}"; done | sort -n -b | column -t | tail -n 1 )
+        echo "${biggest_subpath}"
+        biggest_subpath="${biggest_subpath##* }"
+        export biggest_subpath=$(readlink -e "${root_path}/${biggest_subpath}")
+        if [ "${root_path}" != "${biggest_subpath}" ]; then
+            dircountsmax "${biggest_subpath}"
+        fi
+    fi
+}
+
+# A good tarball archive will have a single base path directory. The best
+# tarballs will have that directory path name be exactly the same as the name of
+# the tarball, excluding the tarball extension. Sometimes you will open a tarball
+# into the current working directory only too find too late that you have blown a
+# thousand files all over the place. The following is an example of how to
+# prevent that.
+
+is_explosive() {
+    TARBALL_NAME=$1
+    tar ztf "${TARBALL_NAME}" | grep -qv "^$(tar ztf "${TARBALL_NAME}" | (read line; echo ${line}))"
+    return $?
+}
+
+safe_tar_x() {
+    TARBALL_NAME=$1
+    if is_explosive ${TARBALL_NAME}; then
+        SUBDIR=${TARBALL_NAME%.tar.gz}
+        SUBDIR=${SUBDIR##*/}
+        mkdir "${SUBDIR}"
+        echo "WARNING: This tarball is explosive. Opening in subdirectory, ${SUBDIR}, for safety." >&2
+    else
+        SUBDIR="."
+    fi
+    # Tar quirks: "--directory" must be last, and using more than
+    #     one option group requires that all groups start with a dash.
+    tar -zxf "${TARBALL_NAME}" --directory "${SUBDIR}"
+    return $?
+}
+
+psg() {
+    pattern=[^]]${1}
+    case "$(uname -s)" in
+    Darwin)
+        ps -A -ww -o pid,ppid,nice,pri,pcpu,pmem,etime,user,wchan,stat,command | grep -i -e "^[[:space:]]*PID" -e ${pattern}
+        ;;
+
+    Linux)
+        ps -A -ww -o pid,ppid,tid,nice,pri,pcpu,pmem,etime,user,wchan:20,stat,command | grep -i -e "^[[:space:]]*PID" -e ${pattern}
+        ;;
+
+    *)
+        # 'other OS'
+        ps -A -ww -o pid,ppid,nice,pri,pcpu,pmem,etime,user,wchan,stat,command | grep -i -e "^[[:space:]]*PID" -e ${pattern}
+        ;;
+    esac
 }
 
 # I'm trying to eliminate aliases that add defaults to existing commands. This
@@ -363,3 +444,4 @@ dircounts-max ()
 #alias rkhunter='rkhunter -c -sk --quiet'
 
 # END OF .bash_aliases
+# vim: set ft=sh sr et ts=4 sw=4 : See help 'modeline'

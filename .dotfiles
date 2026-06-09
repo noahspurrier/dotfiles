@@ -1,11 +1,12 @@
 #!/bin/sh
-# 
+#
 # This script updates dotfiles from a remote web server.
 #
 # WARNING! Running this script will overwrite many of your dotfiles!
-# This includes .bashrc, .vimrc and others you may be fond of.
+# This includes .bashrc, .vimrc and many others you may be fond of.
 # Note that this operates in the current working directory.
-# It does not run relative to ~/. or to $HOME, so it is "safe" to
+# It does not run relative to ~/. or to $HOME, and it does not
+# move out of the current working directory, so it is "safe" to
 # run this is a temporary directory to see what it would do if you ran
 # in in your home directory.
 #
@@ -15,7 +16,6 @@
 #
 # Your .bashrc_local will be sourced at the end of the .bashrc script.
 #
-# And remember, folks:
 #     I am Locutus of Borg. Resistance is futile.
 #     Your life, as it has been, is over.
 #     From this time forward, you will service us.
@@ -90,10 +90,11 @@ else
         fi
     else
         # Some systems don't have the stat command... and some don't even have awk!
-        TARBALL_SIZE=$(ls -s ${DOTFILES_TARBALL} | sed 's/ \+.*$//')
+        #TARBALL_SIZE=$(ls -s ${DOTFILES_TARBALL} | sed 's/ \+.*$//')
+        TARBALL_SIZE=$(ls -s ${DOTFILES_TARBALL} | sed 's/\([0-9]*\).*/\1/')
         if [ ${TARBALL_SIZE:-0} -lt 50 ]; then
             echo "ERROR: Could not verify ${DOTFILES_TARBALL}."
-            echo "ERROR: Download file size is too small."
+            echo "ERROR: The download file size is too small."
             exit 1
         fi
     fi

@@ -1,17 +1,45 @@
 = sudo =
-# This turns off passwords for sudo. This is less secure!
+# This turns off passwords sudo for given user or group.
 # Add these lines to the END of sudoers using `visudo`.
 # The first one is a groupname, the second one is a username.
 %admin ALL=(ALL) NOPASSWD: ALL
 noah ALL=(ALL) NOPASSWD: ALL
+nspurrier ALL=(ALL) NOPASSWD: ALL
+
 = /etc/network/interfaces =
-# The primary network interface
+auto lo
+iface lo inet loopback
+## DHCP configured
 # auto eth0
 # iface eth0 inet dhcp
+## Manually configured (here to mark it for completeness)
+# auto eth0
+# iface eth0 inet manual
+## Link Local -- Avahi Zeroconf (169.254.0.0/16)
+# auto eth0
+# iface eth0 inet ipv4ll
+## bootp configured
+# auto eth0
+# iface eth0 inet bootp
+## Static configuration -- address, netmask, gateway are minimal.
+##      network and broadcast are usually not necessary as they are
+##      calculated from address and netmask.
 auto eth0
 iface eth0 inet static
-    address 192.168.0.100
+    address 192.168.1.100
     netmask 255.255.255.0
-    gateway 192.168.0.1
+    gateway 192.168.1.1
+#    network 192.168.1.0
+#    broadcast 192.168.1.255
+    dns-nameservers 8.8.8.8
+## Bridge interfaces eth0 and eth1
+auto br0
+iface br0 inet static
+    address 10.10.10.10
+    netmask 255.255.255.0
+    gateway 10.10.10.1
+    bridge_ports eth0 eth1
+    up /usr/sbin/brctl stop br0 on
+
 = notes =
 [[include:~.notes.d/]]

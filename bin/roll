@@ -20,12 +20,12 @@
 #         service.1.log --> service.2.log
 #         service.2.log --> service.3.log
 #
-#     Note that this script is not atomic. If you stop the script while
-#     it is running then you may end up with missing files.
+#     Note that this script is not atomic. If you terminate the script while
+#     it is running then you may end up with inconsistent and missing files.
 #
-# EXAMPLES
+# EXAMPLE
 #
-#     roll service.log
+#     roll /var/log/service.log
 #
 # EXIT STATUS
 #
@@ -165,8 +165,14 @@ exit_with_message() {
 	if [ "${EXIT_CODE}" != "0" ]; then
 		exec 1>&2
 		echo
-		echo "Usage: $0 [-h | --help]"
-		echo "  -h --help         : Shows this help."
+                echo "Usage: $0 [-h | --help] FILE"
+                echo "  -h --help         : Shows this help."
+                echo "  FILE              : The filename to be rotated. Must exist."
+                echo "All files names that fit the pattern, FILE.[0-9] will have their"
+                echo "integer incremented. The base file, FILE, will be renamed to FILE.1."
+                echo "If the files have an extension then integer will before placed"
+                echo "before the extension. So 'server.log' would be rolled as"
+                echo "server.1.log, server.2.log, server.3.log, etc."
 		echo
 		echo $COLOR_RED
 	fi
@@ -207,7 +213,7 @@ while [ $# != 0 ]; do
 done
 
 #
-# Cleanup the filename and figure out the extension.
+# Cleanup the filename and extract the extension.
 #
 FILENAME_CANONICAL=$(canonical "${FILENAME}")
 if [ -z ${FILENAME##*/} ]; then
@@ -224,7 +230,7 @@ else
 fi
 
 #
-# Check the the destination file and directory exists.
+# Check that the destination file and directory exists.
 #
 if [ ! -w ${DIRNAME} ]; then
 	msg="ERROR: no write permission on directory.\n"
@@ -238,7 +244,7 @@ if [ ! -f ${FILENAME_CANONICAL} ]; then
 fi
 
 #
-# Loop through the files and rename the index numbers.
+# Loop through the file names and increment their index numbers.
 #
 RUNNING=1
 index=1

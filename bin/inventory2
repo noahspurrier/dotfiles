@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 PWD=$(pwd)
 START_DIRECTORY=${PWD}
@@ -145,7 +145,7 @@ fi
 print_section "Was /proc/config.gz built in?"
 if [ -r /proc/config.gz ]; then
 	echo "Yes, calculating md5sum..."
-	md5sum /proc/config.gz
+	md5sum -b /proc/config.gz
 else
 	echo "ERROR: /proc/config.gz NOT FOUND."
 fi

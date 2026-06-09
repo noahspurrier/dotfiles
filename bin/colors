@@ -1,68 +1,109 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-echo -en "\033[0m"
-echo "Return to default color:"
+echo "Reset character properties:"
 echo '    echo -en "\033[0m"'
-
-echo "Regular colors where COLOR_NUM is 0-7:"
-echo '    echo -en "\033[4${COLOR_NUM}m"'
-for COLOR_NUM in $(seq 0 7); do
-	echo -n "${COLOR_NUM} "
-done
-echo
-for COLOR_NUM in $(seq 0 7); do
-	echo -en "\033[4${COLOR_NUM}m  "
-	echo -en "\033[0m"
-done
+echo -en "\033[0m"
 echo
 
-echo "Bright colors where COLOR_NUM is 0-7:"
-echo '    echo -en "\033[10${COLOR_NUM}m"'
-for COLOR_NUM in $(seq 0 7); do
-	echo -n "${COLOR_NUM} "
-done
+echo "Bold:"
+echo '    echo -en "\033[1m"'
+echo -en "    "
+echo -en "\033[1mBold Text"
+echo -en "\033[0m"
 echo
-for COLOR_NUM in $(seq 0 7); do
-	echo -en "\033[10${COLOR_NUM}m  "
-	echo -en "\033[0m"
+echo
+echo "Underline:"
+echo '    echo -en "\033[4m"'
+echo -en "    "
+echo -en "\033[4mUnderline Text"
+echo -en "\033[0m"
+echo
+echo
+echo "Blink:"
+echo '    echo -en "\033[5m"'
+echo -en "    "
+echo -en "\033[5mBlink Text"
+echo -en "\033[0m"
+echo
+echo
+echo "Bold Underline Blink:"
+echo '    echo -en "\033[1m\033[4m\033[5m"'
+echo -en "    "
+echo -en "\033[1m\033[4m\033[5mBold Underline Blink Text"
+echo -en "\033[0m"
+echo
+echo
+
+echo "Regular foreground colors where COLOR_NUM is 30-37:"
+echo '    echo -en "\033[${COLOR_NUM}m"'
+for COLOR_NUM in $(seq 30 37); do
+    echo -en "\033[${COLOR_NUM}m ${COLOR_NUM} "
+    echo -en "\033[0m"
 done
 echo
 
-echo "Extended colors:"
-echo '    echo -en "\033[48;5;${COLOR_NUM}m"'
-echo "Extended colors 0-15; alternate form for regular and bright colors:"
+echo "Bright foreground colors where COLOR_NUM is 90-97:"
+echo '    echo -en "\033[${COLOR_NUM}m"'
+for COLOR_NUM in $(seq 90 97); do
+    echo -en "\033[${COLOR_NUM}m ${COLOR_NUM} "
+    echo -en "\033[0m"
+done
+echo
+
+echo "Regular background colors where COLOR_NUM is 40-47:"
+echo '    echo -en "\033[${COLOR_NUM}m"'
+for COLOR_NUM in $(seq 40 47); do
+    echo -en "\033[${COLOR_NUM}m ${COLOR_NUM} "
+    echo -en "\033[0m"
+done
+echo
+
+echo "Bright background colors where COLOR_NUM is 100-107:"
+echo '    echo -en "\033[${COLOR_NUM}m"'
+for COLOR_NUM in $(seq 100 107); do
+    echo -en "\033[${COLOR_NUM}m${COLOR_NUM} "
+    echo -en "\033[0m"
+done
+echo
+echo
+
+echo "256 color mode"
+echo '    Character foreground color:'
+echo '        echo -en "\033[38;5;${COLOR_NUM}m"'
+echo '    Character background color:'
+echo '        echo -en "\033[48;5;${COLOR_NUM}m"'
+echo "Colors 0-15 (16 colors) are equivalant to Regular and Bright colors."
 for COLOR_NUM in $(seq 0 15); do
-	echo -en "\033[48;5;${COLOR_NUM}m  "
-	echo -en "\033[0m"
-	if [ $(( (${COLOR_NUM}+1)%8 )) -eq 0 ]; then
-		echo
-	fi
+    echo -en "\033[48;5;${COLOR_NUM}m  "
 done
-echo "Extended colors 16-231; 6x6x6 color cube:"
+echo -en "\033[0m"
+echo
+echo "Colors 16-231 are a 6x6x6 color cube (216 colors):"
 for COLOR_NUM in $(seq 16 231); do
-	echo -en "\033[48;5;${COLOR_NUM}m  "
-	echo -en "\033[0m"
-	if [ $(( (${COLOR_NUM}-3)%6 )) -eq 0 ]; then
-		echo
-	fi
+    if [ ${COLOR_NUM} -lt 100 ]; then
+        pad="  "
+    else
+        pad=" "
+    fi
+    #fgcolor=$(( 255 - (((${COLOR_NUM}-16)%36)/6*4) ))
+    if [ $(( (${COLOR_NUM}-16)%36 )) -lt 6 ]; then
+        fgcolor=15
+    else
+        fgcolor=0
+    fi
+    echo -en "\033[38;5;${fgcolor}m\033[48;5;${COLOR_NUM}m${pad}${COLOR_NUM}  "
+    echo -en "\033[0m"
+    if [ $(( (${COLOR_NUM}-15)%6 )) -eq 0 ]; then
+        echo
+    fi
 done
-echo "Extended colors 232-255; gray ramp excluding black and white:"
+echo "Colors 232-255 are a gray ramp (24 colors), dark to light,"
+echo "    not including black and white:"
 for COLOR_NUM in $(seq 232 255); do
-	echo -en "\033[48;5;${COLOR_NUM}m  "
-	echo -en "\033[0m"
+    echo -en "\033[48;5;${COLOR_NUM}m  "
+    echo -en "\033[0m"
 done
 echo
-
-echo "Regular foreground colors where COLOR_NUM is 0-7:"
-echo '    echo -en "\033[3${COLOR_NUM}m"'
-for COLOR_NUM in $(seq 0 7); do
-	echo -n "${COLOR_NUM} "
-done
-echo
-for COLOR_NUM in $(seq 0 7); do
-	echo -en "\033[3${COLOR_NUM}mHello "
-	echo -en "\033[0m"
-done
 echo
 
 ####T='gYw'   # The test text
@@ -83,19 +124,20 @@ echo
 
 ####ansi-test()
 ####{
-####	for a in 0 1 4 5 7; do
-####		echo "a=$a "
-####		for (( f=0; f<=9; f++ )) ; do
-####			for (( b=0; b<=9; b++ )) ; do
-####				#echo -ne "f=$f b=$b"
-####				echo -ne "\\033[${a};3${f};4${b}m"
-####				echo -ne "\\\\\\\\033[${a};3${f};4${b}m"
-####				echo -ne "\\033[0m "
-####			done
-####		echo
-####		done
-####		echo
-####	done
-####	echo
+####    for a in 0 1 4 5 7; do
+####        echo "a=$a "
+####        for (( f=0; f<=9; f++ )) ; do
+####            for (( b=0; b<=9; b++ )) ; do
+####                #echo -ne "f=$f b=$b"
+####                echo -ne "\\033[${a};3${f};4${b}m"
+####                echo -ne "\\\\\\\\033[${a};3${f};4${b}m"
+####                echo -ne "\\033[0m "
+####            done
+####        echo
+####        done
+####        echo
+####    done
+####    echo
 ####}
 # vim:set sr et ts=4 sw=4 ft=sh: // See Vim, :help 'modeline'
+

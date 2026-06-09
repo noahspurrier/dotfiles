@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-# vim:set ft=python fileencoding=utf-8 sr et ts=4 sw=4 : See help 'modeline'
 
+# This is a rough draft. It works. I should probably rip out all
+# the overly complicated junk. Most of it is commented out wanyways.
+#
 """
 SYNOPSIS
 
-    bin.py {number} [-h] [-v,--verbose] [--version]
+    bin {number} [-h] [-v,--verbose] [--version]
     {number} may be 0x[0-9a-fA-F]+, [1-9]+[0-9]*, 0[0-7]+, or 0b[0-1]+
     The number will be reprinted in all common bases; hex, dec, oct, bin.
 
@@ -20,13 +22,13 @@ EXAMPLES
 
 EXIT STATUS
 
-    TODO: This exits with status 0 on success and 1 otherwise.
+    This exits with status 0 on success and 1 otherwise.
     This exist with a status greater than 1 if there was an
     unexpected run-time error.
 
 AUTHOR
 
-    TODO: Name <name@example.org>
+    Noah Spurrier <noah@noah.org>
 
 LICENSE
 
@@ -35,7 +37,7 @@ LICENSE
     approved by the Open Source Initiative. For more information vist:
         http://opensource.org/licenses/isc-license.txt
 
-    TODO: Copyright (c) 4-digit year, Company or Person's Name
+    Copyright (c) 2013, Noah Spurrier
 
     Permission to use, copy, modify, and/or distribute this software for any
     purpose with or without fee is hereby granted, provided that the above
@@ -51,7 +53,7 @@ LICENSE
 
 VERSION
 
-    TODO: Version 1
+    Version 1
 """
 
 import sys
@@ -64,8 +66,10 @@ import traceback
 import optparse
 import time
 
+# If the bin built-in function is not available then define it.
 try:
-    if bin (0): pass
+    if bin(0):
+        pass
 except NameError, ne:
     def bin(x):
         if x < 0:
@@ -82,86 +86,161 @@ except NameError, ne:
             out.reverse()
             return '0b' + ''.join(out)
 
-def int_of_bin_str (b):
-    """This takes a binary string and returns the integer value."""
-    if b[0:2] == '0b': b = b[2:]
+
+def int_of_bin_str(b):
+
+    '''This takes a binary string and returns the integer value.'''
+
+    if b[0:2] == '0b':
+        b = b[2:]
     return sum(map(lambda z: int(b[z]) and 2**(len(b) - z - 1),
                    range(len(b)-1, -1, -1)))
 
-def main ():
 
-    global options, args
+def int_to_hex(ii):
 
-    arg_hex  = re.compile ('0x[0-9a-fA-F]+')
-    arg_dec  = re.compile ('^0$|^[1-9]+[0-9]*$')
-    arg_oct  = re.compile ('0[0-7]+')
-    arg_oct2 = re.compile ('0o[0-7]+')
-    arg_bin  = re.compile ('0b[0-1]+')
+    '''The built-in hex() function does not handle extrememly large numbers.'''
+
+    hex_str = ''
+    while ii > 0:
+        bb = ii & 0xf
+        hex_str = hex(bb)[2:] + hex_str
+        ii = ii >> 4
+    return hex_str
+
+
+def number_as_string (number):
+
+    '''This interprets a given number as an ASCII encoded string. The number
+    may represent a partial binary stream, so if the hex value has a odd number
+    of digits then two strings are decoded; one with the right 4 bits truncate,
+    and one with the left 4 bits truncated. If the hex value has an even number
+    of digits then it is assumed to be a byte-aligned string.
+
+    TODO: I might extend this idea to search for likely strings in a bit stream
+    by shifting a bit stream one bit at a time and counting the number of
+    printable characters that results.'''
+
+    try:
+        s1 = binascii.a2b_hex(hexx(number))
+        s2 = None
+    except:
+        s1 = binascii.a2b_hex(hexx(number)[:-1])
+        s2 = binascii.a2b_hex(hexx(number)[1:])
+    return (s1, s2)
+
+
+def hexx (number):
+    '''This is similar to the hex built-in, except that it does not
+    include is leading "0x" and it drops the trailing "L" if there is one.
+    '''
+    ss = hex(number)[2:]
+    if ss[-1] == 'L':
+        ss = ss[:-1]
+    return ss
+
+
+#def count_printable_window (number):
+#    bstream = bin(number)[2:]
+#    offset = len(bstream) % 8
+#    for ii in range(offset):
+#
+def count_printable (ss):
+    count = 0
+    for cc in ss:
+        if cc in string.printable:
+            ++count
+    return count
+
+
+def main(options, args):
+
+    # A zero normally starts a pattern to encode the radix or base of the
+    # number. A zero by itself is a special case. It is treated as a decimal;
+    # although, it shouldn't matter what base it is treated as.
+    arg_hex = re.compile('0x[0-9a-fA-F]+')
+    arg_dec = re.compile('^0$|^[1-9]+[0-9]*$')
+    arg_oct = re.compile('0[0-7]+')
+    arg_oct2 = re.compile('0o[0-7]+')
+    arg_bin = re.compile('0b[0-1]+')
 
     if arg_hex.match(args[0]) is not None:
-        number = int (args[0], 16)
+        number = int(args[0], 16)
     elif arg_dec.search(args[0]) is not None:
-        number = int (args[0], 10)
-    elif arg_oct.match(args[0]) is not None or \
-            arg_oct2.match(args[0]) is not None:
-        number = int (args[0], 8)
+        number = int(args[0], 10)
+    elif (arg_oct.match(args[0]) is not None or
+          arg_oct2.match(args[0]) is not None):
+        number = int(args[0], 8)
     elif arg_bin.match(args[0]) is not None:
         number = int_of_bin_str(args[0])
     else:
-        if len(args[0]) == 1: # assume a single ASCII character to convert.
+        # Now we guess...
+        if len(args[0]) == 1:
+            # assume a single ASCII character to convert.
             number = ord(args[0][0])
         else:
-            try:
-                # Is it ASCII encoded in hex?
-                s = binascii.a2b_hex(args[0])
-                print '  STR: %s' % s
-                return 0
-            except:
-                try:
-                    # Is it data encoded in base64?
-                    s = base64.decodestring(args[0])
-                    print '  STR: %s' % s
-                    return 0
-                except:
-                    raise Exception ("cannot parse string")
+            number = int(binascii.b2a_hex(args[0]),16)
+#            try:
+#                # Is it ASCII encoded in hex?
+#                ss = binascii.a2b_hex(args[0])
+#                number
+##                print '  STR: %s' % repr(s)
+##                return 0
+#            except:
+#                try:
+#                    # Is it data encoded in base64?
+#                    #s = base64.decodestring(args[0])
+#                    s = binascii.a2b_base64(args[0])
+#                    print 'STR64: %s' % repr(s)
+#                    return 0
+#                except:
+#                    raise Exception ("cannot parse string")
 
-    print '  HEX: 0x%X' % number
-    print '  DEC: %d' % number
-    print '  OCT: 0%o' % number
-    print '  BIN: %s' % bin(number)
-    if number in range(256) and chr(number) in string.printable:
-        print 'ASCII: %s' % chr(number)
+    print('  HEX: 0x%X' % number)
+    print('  DEC: %d' % number)
+    print('  OCT: 0%o' % number)
+    print('  BIN: %s' % bin(number))
+#    if number in range(256) and chr(number) in string.printable:
+#        print 'ASCII: %s' % chr(number)
+    (s1, s2) = number_as_string(number)
+    if s2 is None:
+        print('  STR: %s' % repr(s1))
+    else:
+        print(' STR?: %s' % repr(s1))
+        print(' ?STR: %s' % repr(s2))
 
 if __name__ == '__main__':
     try:
         parser = optparse.OptionParser(
-                formatter=optparse.TitledHelpFormatter(),
-                usage=globals()['__doc__'],
-                version='1')
-        parser.add_option ('-x', '--outhex', action='store_true',
-                default=False, help='output hexidecimal')
-        parser.add_option ('-d', '--outdec', action='store_true',
-                default=False, help='output decimal')
-        parser.add_option ('-o', '--outoct', action='store_true',
-                default=False, help='output octal')
-        parser.add_option ('-b', '--outbin', action='store_true',
-                default=False, help='output binary')
-        parser.add_option ('-v', '--verbose', action='store_true',
-                default=False, help='verbose output')
+            formatter=optparse.TitledHelpFormatter(),
+            usage=globals()['__doc__'],
+            version='1'
+        )
+        parser.add_option('-x', '--outhex', action='store_true',
+                          default=False, help='output hexidecimal')
+        parser.add_option('-d', '--outdec', action='store_true',
+                          default=False, help='output decimal')
+        parser.add_option('-o', '--outoct', action='store_true',
+                          default=False, help='output octal')
+        parser.add_option('-b', '--outbin', action='store_true',
+                          default=False, help='output binary')
+        parser.add_option('-v', '--verbose', action='store_true',
+                          default=False, help='verbose output')
         (options, args) = parser.parse_args()
         #if len(args) < 1:
         #    parser.error ('missing argument')
-        exit_code = main()
+        exit_code = main(options, args)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)
-    except KeyboardInterrupt, e: # The user pressed Ctrl-C.
+    except KeyboardInterrupt, e:  # The user pressed Ctrl-C.
         raise e
-    except SystemExit, e: # The script called sys.exit() somewhere.
+    except SystemExit, e:  # The script called sys.exit() somewhere.
         raise e
     except Exception, e:
-        print ('ERROR: Unexpected Exception')
-        print (str(e))
+        print('ERROR: Unexpected Exception')
+        print(str(e))
         traceback.print_exc()
         os._exit(2)
 
+# vim:set ft=python fileencoding=utf-8 sr et ts=4 sw=4 : See help 'modeline'

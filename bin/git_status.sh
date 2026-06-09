@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # When under a git repository this script adds the bash prompt indicators about
 # the repository status.
@@ -40,10 +40,6 @@ reset_colors=$(tput sgr0)
 # Gets a path and returns 0 if it's under a git repository; 1 otherwise
 #
 # If under git repository it prints the path to the .git dir to stdout
-# function current_branch() {
-#   ref=$(git symbolic-ref HEAD 2> /dev/null) || return
-#   echo ${ref#refs/heads/}
-# }
 git.is_rep ()
 {
     local path="${1:-.}"
@@ -231,16 +227,28 @@ prompt_command_git_status ()
 }
 
 
-export original_ps="$PS1"
+export PS1_original="$PS1"
 PROMPT_COMMAND+="$(cat <<EOF
 
     if git.is_rep > /dev/null
     then
-        export PS1="$bold_green\u@\h $bold_blue\W [$reset_colors\$(prompt_command_git_status)$bold_blue] \$ $reset_colors"
+        export PS1="$bold_green\u@\h $bold_blue\W [$reset_colors\$(prompt_command_git_status)$bold_blue]$reset_colors\n\$ "
     else
-        export PS1="\$original_ps"
+        export PS1="\${PS1_original}"
     fi
 EOF
 )"
 
-# vim:ft=bash:
+#####################################################################
+# END
+#########1#########2#########3#########4#########5#########6#########7
+#
+#     __________________            _-_
+#     \___=NCC-1701= __))  ____.---'---`---.____
+#                 \_ \     \----._________.----'
+#                   \ \     / /    `-_-'
+#               __,--`-`---'-'-.
+#              /}___           )(-
+#                   `--.____,-'
+#
+# vim: set ft=bash sr et ts=4 sw=4 : See help 'modeline'

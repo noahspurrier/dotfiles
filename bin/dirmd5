@@ -1,0 +1,79 @@
+#!/bin/sh
+
+######################################################################
+#
+# dirmd5
+#
+# SYNOPSIS
+#
+#     dirmd5 [PATH]
+#
+# DESCRIPTION
+#
+#     This returns the md5sum of an entire directory. The only argument is the
+#     path to process. If no path is given then the current directory is used.
+#     It attempts to detect filename changes and to compensate for sort
+#     differences in different filesystems. It does not yet take into account
+#     file permissions, nor show differences in two different directory
+#     structures.
+#
+# EXAMPLES
+#
+#     $ dirmd5 /home/noah/project 70b8fd2ac11844e9507e30a980ecdc00
+#
+# EXIT STATUS
+#
+#     This exits with status 0 on success or non-zero on error.
+#
+# AUTHOR
+#
+#     Noah Spurrier <noah@noah.org>
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible. This license
+#     identical to the ISC License and is registered with and approved by the
+#     Open Source Initiative. For more information vist:
+#     http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c) 2013, Noah Spurrier <noah@noah.org>
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# VERSION
+#
+#     Version 1
+#
+######################################################################
+
+if [ "$1" ]; then
+	ROOT_PATH="$1"
+else
+	ROOT_PATH="$(pwd)"
+fi
+ROOT_PATH="$(cd ${ROOT_PATH} && pwd)"
+# Follow the first sym-link, if any.
+if readlink ${ROOT_PATH}; then
+	ROOT_PATH=$(readlink ${ROOT_PATH})
+fi
+
+
+# find -name .git -prune -o -type f -print | while read fn; do md5sum -b "${fn}" | sed 's/^\([[:xdigit:]]\+\).*/\1/'; done
+#     does the same this as...
+# find -name .git -prune -o -type f -exec md5sum -b "{}" \; | sed 's/^\([[:xdigit:]]\+\).*/\1/'
+(
+	cd "${ROOT_PATH}"
+	find -name .git -prune -o -type f -exec md5sum -b "{}" \; | sed 's/^\([[:xdigit:]]\+\).*/\1/'
+	find -name .git -prune -o -print | LC_ALL=C sort | md5sum -b | sed 's/^\([[:xdigit:]]\+\).*/\1/'
+) | LC_ALL=C sort | md5sum -b | sed 's/^\([[:xdigit:]]\+\).*/\1/'
+

@@ -1,32 +1,46 @@
-#!/usr/bin/env python
+'''
+.pythonrc
+
+Add the following line to your ~/.bashrc"
+export PYTHONSTARTUP="$HOME/.pythonrc"
+
+'''
+
+# Some of this is done automatically now in Python3.
+import os
+import readline
+import rlcompleter
+import atexit
+history_file = os.path.join(os.environ['HOME'], '.python_history')
+atexit.register(readline.write_history_file, history_file)
+try:
+    readline.read_history_file(history_file)
+except IOError:
+    pass
+# Negative length for unlimited history.
+readline.set_history_length(-1)
+readline.parse_and_bind("tab: complete")
+readline.parse_and_bind('"\e[B": history-search-forward')
+readline.parse_and_bind('"\e[A": history-search-backward')
+readline.parse_and_bind('set blink-matching-paren on')
+readline.parse_and_bind('set skip-completed-text on')
+readline.parse_and_bind('set completion-query-items -1')
+readline.parse_and_bind('set show-all-if-ambiguous on')
+del history_file
+del atexit
+del rlcompleter
+del readline
+del os
+
+#import sys
+#sys.ps2=''
+#del sys
 
 try:
-    import readline
-except ImportError:
-    print ("Module readline not available.")
-else:
-    # Setup readline and history saving
-    from atexit import register
-    from os import path
-    import rlcompleter
+    import boto3
+    print('Imported boto3')
+except:
+    pass
 
-    # Set up a tab for completion; use a single space to indent Python code.
-    readline.parse_and_bind('set show-all-if-ambiguous on')
-    readline.parse_and_bind('tab: complete')
+print('Imported %s' % __file__)
 
-    history = path.expanduser('~/.python_history')
-    readline.set_history_length(1000)
-
-    # Read the history of the previous session, if it exists.
-    if path.exists(history):
-        readline.read_history_file(history)
-
-    # Set up history saving on exit.
-    def save(history=history, readline=readline):
-        readline.write_history_file(history)
-
-    register(save)
-
-    # Clean up the global name space. Note that save, history, and readline
-    # will continue to exist, since del decrements the reference count by one.
-    del register, path, readline, rlcompleter, history, save

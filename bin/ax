@@ -12,32 +12,35 @@
 # one file in the current directory.
 #
 # Noah Spurrier 2010-04-16 23:35:46-07:00
-
+#
 OPT='xf'
 for FILENAME in "$@"; do
 	case "${FILENAME}" in
-	*.tgz)     gunzip -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tar.Z)   uncompress -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tar.bz2) bunzip2 -c "${FILENAME}" | tar ${OPT} - ;;
 	*.tar.gz)  gunzip -c "${FILENAME}" | tar ${OPT} - ;;
 	*.tbz2)    bunzip2 -c "${FILENAME}" | tar ${OPT} - ;;
-	*.tar.bz2) bunzip2 -c "${FILENAME}" | tar ${OPT} - ;;
+	*.tgz)     gunzip -c "${FILENAME}" | tar ${OPT} - ;;
 	*.tZ)      uncompress -c "${FILENAME}" | tar ${OPT} - ;;
-	*.tar.Z)   uncompress -c "${FILENAME}" | tar ${OPT} - ;;
-	*.gz)      gunzip "${FILENAME}" ;;
-	*.bz2)     bunzip2 "${FILENAME}" ;;
 	*.Z)       uncompress "${FILENAME}" ;;
+	*.bz2)     bunzip2 "${FILENAME}" ;;
+	*.gz)      gunzip "${FILENAME}" ;;
 	*.tar)     tar ${OPT} ${FILENAME} ;;
-	*.zip)     unzip -lv "${FILENAME}"
-		echo "Unzip this manually with 'unzip ${FILENAME}'"
+	*.zip)
+		mkdir -p ${FILENAME%.zip}
+		cd ${FILENAME%.zip}
+		unzip ../${FILENAME}
+		cd ..
 	;;
 	*.7z)      7z x "${FILENAME}" ;;
 	*.rar)
-		if which unrar >/dev/null; then
+		if type unrar >/dev/null; then
 			unrar x "${FILENAME}"
 		else
 			unrar-free -x "${FILENAME}"
 		fi
 	;;
-	*)      echo "ERROR: Filename, ${FILENAME} was not found" >&2
+	*)      echo "ERROR: Could not find a tool to uncompress ${FILENAME}." >&2
 		exit 1
 	;;
 	esac

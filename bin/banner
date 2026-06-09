@@ -126,8 +126,10 @@ import string
 import getopt
 import traceback
 
+
 def exit_with_usage(exit_code=1):
-    print globals()['__doc__']
+
+    print (globals()['__doc__'])
     sys.exit(exit_code)
 
 # This font storage format is not very efficient, but
@@ -322,7 +324,7 @@ font_six= """
 font_six = font_six[1:]
 font_five= font_five[1:]
 
-def dump_xpm (page, geometry=(32,32)):
+def dump_xpm(page, geometry=(32,32)):
 
     """This dumps the given page to stdout in XPM pixmap format."""
 
@@ -338,19 +340,20 @@ static char * banner_xpm[] = {
 ".  c #FFFFFF",
 "#  c #000000",
 """ % locals()
-    print xpm_header
-    for l in page:
-        print '"' + l + '",'
-    print "};"
+    print(xpm_header)
+    for ll in page:
+        print('"' + ll + '",')
+    print("};")
 
-def dump_page (page):
+def dump_page(page):
 
     """This dumps the given page to stdout."""
 
-    for l in page:
-        print l
+    for ll in page:
+        print(string.rstrip(ll))
+    print
 
-def rotate (page):
+def rotate(page):
 
     """This returns the give page rotated clockwise by 90 degrees."""
 
@@ -359,10 +362,10 @@ def rotate (page):
         ll = list(vl)
         ll.reverse()
         new_page.append(string.join(ll,sep=''))
-        #print string.join(ll,sep='')
+        #print(string.join(ll,sep=''))
     return new_page
 
-def hcenter (page, pixel_width):
+def hcenter(page, pixel_width):
 
     """This centers the "page" horizontally in the given width."""
 
@@ -378,7 +381,7 @@ def hcenter (page, pixel_width):
         new_page.append(r)
     return new_page
 
-def vcenter (page, pixel_height):
+def vcenter(page, pixel_height):
 
     """This centers the "page" vertically in the given height."""
 
@@ -426,7 +429,7 @@ def c_to_coord(c):
     if y > 11: x = 7;y = 11
     return (x,y)
 
-def get_raster_data_by_char_five (c=None):
+def get_raster_data_by_char_five(c=None):
 
     """This returns the raster data for the given character. """
 
@@ -434,7 +437,7 @@ def get_raster_data_by_char_five (c=None):
         return ['','','','','','']
     return get_raster_data_five(*c_to_coord(c))
 
-def get_raster_data_by_char_six (c=None):
+def get_raster_data_by_char_six(c=None):
 
     """This returns the raster data for the given character. """
 
@@ -442,7 +445,7 @@ def get_raster_data_by_char_six (c=None):
         return ['','','','','','','']
     return get_raster_data_six(*c_to_coord(c))
 
-def get_raster_data_five (x,y):
+def get_raster_data_five(x,y):
 
     """This returns the raster data for the given coordinate. """
 
@@ -461,7 +464,7 @@ def get_raster_data_five (x,y):
     letter.append(font_five[start:start+6])
     return letter
 
-def get_raster_data_six (x,y):
+def get_raster_data_six(x,y):
 
     """This returns the raster data for the given coordinate. """
 
@@ -482,7 +485,7 @@ def get_raster_data_six (x,y):
     letter.append(font_six[start:start+7])
     return letter
 
-def append_raster_data (left_data, right_data):
+def append_raster_data(left_data, right_data):
 
     """This appends the given raster data in right_data to the right side of
     left_data. Note that weird things will happen if left_data and right_data
@@ -491,7 +494,7 @@ def append_raster_data (left_data, right_data):
 
     return [z[0]+z[1] for z in zip(left_data,right_data)]
 
-def vappend_raster_data (top_data, bottom_data):
+def vappend_raster_data(top_data, bottom_data):
 
     """This appends the given raster data in bottom_data to the bottom of the
     top_data. Note that the final width will grow to fit the widest band of
@@ -510,12 +513,12 @@ def vappend_raster_data (top_data, bottom_data):
         new_word.append(l)
     return new_word
 
-def append_letter_five (w1, c):
+def append_letter_five(w1, c):
 
     letter = get_raster_data_by_char_five(c)
     return append_raster_data(w1, letter)
 
-def append_string_five (word, s):
+def append_string_five(word, s):
 
     if word is None:
         word = get_raster_data_by_char_five(None)
@@ -523,12 +526,12 @@ def append_string_five (word, s):
         word = append_letter_five(word, c)
     return word
 
-def append_letter_six (w1, c):
+def append_letter_six(w1, c):
 
     letter = get_raster_data_by_char_six(c)
     return append_raster_data(w1, letter)
 
-def append_string_six (word, s):
+def append_string_six(word, s):
 
     if word is None:
         word = get_raster_data_by_char_six(None)
@@ -536,7 +539,7 @@ def append_string_six (word, s):
         word = append_letter_six(word, c)
     return word
 
-def crop (page, geometry):
+def crop(page, geometry):
 
     """This crops the raster data to the given geometry.
     It also centers and grows the raster data to fit the given geometry.
@@ -555,7 +558,7 @@ def crop (page, geometry):
         page = hcenter(page, geometry[0])
     return page
 
-def main ():
+def main():
 
     try:
         optlist, args = getopt.getopt(sys.argv[1:], 'h?56xrjg:', ['help','h','?'])
@@ -566,7 +569,7 @@ def main ():
         #if len(options)==0 and len(args)==0:
         #    exit_with_usage(0)
     except Exception, e:
-        print str(e)
+        print(str(e))
         exit_with_usage()
 
     if '-j' in options:
@@ -612,7 +615,7 @@ def main ():
         g[0] = int(g[0])
         g[1] = int(g[1])
         if g[0]<1 or g[1]<1:
-            print ("ERROR: geometry is impossibly small.")
+            print("ERROR: geometry is impossibly small.")
             exit_with_usage(4)
         crop(page, g)
 
@@ -620,17 +623,17 @@ def main ():
     if '-x' in options:
         dump_xpm(page,g)
     else:
-        dump_page (page)
+        dump_page(page)
 
 if __name__ == "__main__":
     try:
         main()
     except Exception, e:
         tb_dump = traceback.format_exc()
-        print "==============================================================="
-        print "ERROR -- Unexpected exception in script."
-        print str(e)
-        print str(tb_dump)
-        print "==============================================================="
+        print ("=============================================================")
+        print ("ERROR -- Unexpected exception in script.")
+        print (str(e))
+        print (str(tb_dump))
+        print ("=============================================================")
         exit_with_usage(3)
 

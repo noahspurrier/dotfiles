@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# This has a similar purpose as 'lsof', but simpler.
+
+cd /proc
+while [ "$1" != "" ]; do
+    for nn in [1-9]*; do
+        if [ "${nn}" != "self" -a -f ${nn}/cmdline ]; then
+            if grep -q "$1" ${nn}/cmdline; then
+#                cmdline=$(tr '\0' ' ' < ${nn}/cmdline)
+#                printf "%d %s\n" ${nn} "${cmdline}"
+                for mm in ${nn}/fd/*; do
+                    if ! link_target=$(readlink ${mm}); then
+                            link_target=${mm}
+                    fi
+		    if grep -q "$1" ${link_target}; then
+			printf "    %-20s %s\n" "${PWD}/${mm}" "${link_target}"
+			fi
+                done
+            fi
+        fi
+    done
+    shift
+done

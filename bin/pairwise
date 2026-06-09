@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# This runs the given COMMAND on a sliding window of pairs of arguments.
+# For example, "pairwise diff f1 f2 f3 f4 f5" becomes:
+#     diff f1 f2
+#     diff f2 f3
+#     diff f3 f4
+#     diff f4 f5
+
+: ${1?"Usage: $0 COMMAND ARG1 ARG2 ARG3 ... ARGN"}
+
+COMMAND=$1
+shift
+
+fn1=''
+for fn in "$@"; do
+	if [ -z "${fn1}" ]; then
+		fn1=${fn}
+		continue
+	fi
+	"${COMMAND}" "${fn1}" "${fn}"
+	fn1=${fn}
+done
+

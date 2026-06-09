@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# This outputs the date in epoch format.
+# 	1354141834
+# See also .bash_aliases for bash functions 'epoch' and 'epoch-to-rfc-3339'.
+# This is a trivial wrapper around the `date` utility.
+# I didn't make this an alias because I wanted to
+# be able to call this from inside tools like Vim. For example,
+# in Vim I can type the following to insert an epoch date:
+#         :r!date-epoch
+
+date "+%s" "$@"

@@ -87,7 +87,8 @@ OUI_CACHE="/var/tmp/oui.txt"
 MIN_CACHE_AGE_SECONDS=3600
 # This is the official system of record for OUI assignments.
 #IEEE_URL="http://standards.ieee.org/regauth/oui/oui.txt"
-IEEE_URL="http://standards.ieee.org/develop/regauth/oui/oui.txt"
+#IEEE_URL="http://standards.ieee.org/develop/regauth/oui/oui.txt"
+IEEE_URL="http://standards-oui.ieee.org/oui.txt"
 
 refresh_oui_cache () {
 	cache_age=$(stat -c %Y ${OUI_CACHE})

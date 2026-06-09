@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+# This will print the distance from the nut to each fret
+# over a two octave range given an open string length.
+
+import sys
+from fractions import Fraction
+# Set string length here. Units don't matter. Output is in the same units.
+string_length = float(sys.argv[1])
+
+#octave_scale_division_count = 5
+octave_scale_division_count = 12
+teenths = 32 #16
+
+def fixed_denominator(fr, denominator):
+    factor=denominator/fr.denominator
+    return (fr.numerator * factor, fr.denominator * factor)
+
+def fixed_denominator_str(fr, denominator):
+    fixed=fixed_denominator(fr, denominator)
+    return "%d/%d" % fixed
+
+# This should give the same results.
+# This calculates the same information in a different way.
+#fret_length_factors = [ 0.056126, 0.109101, 0.159104, 0.206291, 0.250847,
+#        0.292893, 0.33258, 0.370039, 0.405396, 0.438769, 0.470268, 0.5,
+#        0.528063, 0.554551, 0.579552, 0.60315, 0.625423, 0.646447, 0.66629,
+#        0.68502, 0.702698, 0.719385, 0.735134, 0.75 ]
+#fret_number = 1
+#sys.stdout.write('fret      distance from\n')
+#sys.stdout.write('number    nut to fret\n')
+#for length_factor in fret_length_factors:
+#    sys.stdout.write('%3d      %5.2f'%(fret_number, (length_factor * string_length)))
+#    sys.stdout.write('\n')
+#    fret_number += 1
+
+#string_length - (string_length / (2**(13/12.0)))
+sys.stdout.write('Column definitions:\n'
+        '   1: Fret number\n'
+        '   2: Distance from nut to fret in your units, to thousandths.\n'
+        '   3:      your units rounded to 32ths.\n'
+        '   4:      your units rounded to 16ths.\n'
+        '   5:      your units as inches converted to millimeters.\n'
+        '           Ignore this if your units were not in inches.\n')
+sys.stdout.write('='*79 + '\n')
+sys.stdout.write('%3s  %6s  %8s  %8s  %7s\n'%('1:','2:','3:','4:','5:'))
+sys.stdout.write('-'*79 + '\n')
+for fret_number in range(1,1+(octave_scale_division_count*2)):
+    fret_distance = string_length - (string_length / (2 ** (fret_number/float(octave_scale_division_count))))
+    as_fraction = Fraction(int(round((fret_distance-int(fret_distance)) * teenths)), teenths)
+    as_fraction2 = Fraction(int(round((fret_distance-int(fret_distance)) * (teenths/2))), (teenths/2))
+    fret_distance_mm = fret_distance * 25.4
+    sys.stdout.write('%3d  %6.3f  %2d+%5s  %2d+%5s  %7.3fmm'%(fret_number, fret_distance, int(fret_distance), fixed_denominator_str(as_fraction, teenths), int(fret_distance), fixed_denominator_str(as_fraction2,(teenths/2)), fret_distance_mm) )
+    sys.stdout.write('\n')
+

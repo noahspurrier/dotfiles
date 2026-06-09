@@ -16,7 +16,7 @@
 
 " Unset PAGER environment variable to prevent recursive
 " fork when using Vim's 'Man' command.
-" This works with the PAGER setting in .profile or .bashrc. 
+" This works with the PAGER setting in .profile or .bashrc.
 let $PAGER=''
 
 set nocompatible " use vim defaults (this should be first in .vimrc)
@@ -64,13 +64,12 @@ else
     set background=dark
 endif
 
-"highlight LiteralTabs ctermbg=darkgreen guibg=darkgreen
-"match LiteralTabs /\s\ /
-"highlight ExtraWhitespace ctermbg=darkgreen guibg=darkgreen
-"match ExtraWhitespace /\s\+$/
-
 "set guifont=Lucida_Console:h8 " set gvim font on Windows
 syntax on " use syntax color highlighting
+"Change the comment color in syntax highlighting because the
+"default comment color is the same as variable declarations, which makes it
+"difficult to distinguish between commented-out code and active code.
+hi Comment ctermfg=3
 "colo ps_color " color scheme in ~/.vim/colors
 "set visualbell " flash instead of beep -- this can be annoying
 "set visualbell t_vb= " no beep or flash
@@ -105,9 +104,10 @@ set sidescroll=1 " smooth scroll if set nowrap. for slow terminals set to 0.
 "set showbreak=>>>> " string to print before wrapped lines
 " set backup " backup files before editing
 " set backupdir=~/tmp,.,/tmp,/var/tmp " backup locations
-set dir=~/tmp,.,/tmp,/var/tmp " swap file locations
+set dir=~/tmp,/tmp,/var/tmp,. " swap file locations
+set undodir=~/tmp,/tmp,/var/tmp,. " undo file locations
 set virtualedit=block " allow selection anywhere when in Visual block mode
-set laststatus=2 " always show statusline 
+set laststatus=2 " always show statusline
 set statusline=%n\ %1*%h%f%*\ %=%<[%3lL,%2cC]\ %2p%%\ 0x%02B%r%m
 set ruler " show ruler, but only shown if laststatus is off
 set rulerformat=%h%r%m%=%f " sane value in case laststatus is off
@@ -119,6 +119,37 @@ set wildmode=longest:full " make completion work like Bash.
 set title " shows the current filename and path in the term title.
 set showfulltag " show search pattern when completion matches in a tag file.
 set listchars=eol:$,tab:>-,trail:.,extends:>,precedes:< " :h 'list
+function! HighlightTabs()
+    if &filetype!="help"
+        syntax match TAB /\t/ containedin=ALL
+        highlight TAB ctermbg=red ctermfg=white cterm=underline
+    endif
+endfunction
+function! HighlightTrailingWhitespace()
+    if &filetype!="help"
+        syntax match TRAILING /[\t ]*$/ containedin=ALL
+        highlight TRAILING ctermbg=red ctermfg=white cterm=underline
+    endif
+endfunction
+function! HighlightParens()
+    "Level1(Level2(Level3(Level4(Level5(Level6())))))
+    syntax region par1 matchgroup=par1 start=/(/ end=/)/ contains=par2 containedin=ALL
+    syntax region par2 matchgroup=par2 start=/(/ end=/)/ contains=par3 contained
+    syntax region par3 matchgroup=par3 start=/(/ end=/)/ contains=par4 contained
+    syntax region par4 matchgroup=par4 start=/(/ end=/)/ contains=par5 contained
+    syntax region par5 matchgroup=par5 start=/(/ end=/)/ contains=par6 contained
+    syntax region par6 matchgroup=par6 start=/(/ end=/)/ contains=par1 contained
+    highlight par1 ctermfg=red guifg=red
+    highlight par2 ctermfg=blue guifg=blue
+    highlight par3 ctermfg=darkgreen guifg=darkgreen
+    highlight par4 ctermfg=yellow guifg=yellow
+    highlight par5 ctermfg=DarkMagenta guifg=DarkMagenta
+    highlight par6 ctermfg=white guifg=white
+endfunction
+au BufEnter,BufRead * call HighlightTabs()
+au BufEnter,BufRead * call HighlightTrailingWhitespace()
+au BufEnter,BufRead * call HighlightParens()
+
 if version >= 630
     set viminfo=!,%,'20,/100,:100,s100,n~/.viminfo " options for .viminfo
 else
@@ -246,12 +277,6 @@ nnoremap Q @q
 " command mode, so loosing q: is no loss.
 map q: :q
 
-" easy indentation in visual mode
-" This keeps the visual selection active after indenting.
-" Usually the visual selection is lost after you indent it.
-vmap > >gv
-vmap < <gv
-
 " Use display movement with arrow keys for extra precision. Arrow keys will
 " move up and down the next line in the display even if the line is wrapped.
 " This is useful for navigating very long lines that you often find with
@@ -270,12 +295,22 @@ vmap <down> gj
 map <C-J> <C-W>j<C-W>_
 map <C-K> <C-W>k<C-W>_
 
-" This maps \y so that it will yank the visual selection, and also quote the
-" regex metacharacters so you can then paste into a search pattern. For
-" example, use v to select some text. Press \y. Then start a search with /.
-" Type CTRL-R" to insert the yanked selection. The last two mappings allow you
-" to visual select an area and then search for other matches by typing * or #.
-vmap <silent> <leader>y y:let @"=substitute(escape(@",'.$*[^\/~'),'\n','\\n','g')<CR>
+" This allows easy indentation in visual mode.
+" This keeps the visual selection active after indenting.
+" Normally the visual selection is lost after you indent it.
+vmap > >gv
+vmap < <gv
+
+" Do not save the replaced text in reg when pasting in visual mode.
+" This allows you to keep using your paste register.
+xnoremap p pgvy
+xnoremap P Pgvy
+
+" These mappings extend the spirit of * and # for visual searching.
+" Use visual select to select an area, then search for matches by
+" typing * or #. This is very useful for searching for other instances of
+" long, complex strings that may contain regex methacharacters and multiple
+" lines. You don't have to worry about quoting.
 vmap <silent> * y:let @/=substitute(escape(@",'.$*[^\/~'),'\n','\\n','g')<CR>n
 vmap <silent> # y:let @/=substitute(escape(@",'.$*[^\/~'),'\n','\\n','g')<CR>N
 vnoremap <silent> * :<C-U>
@@ -292,12 +327,22 @@ vnoremap <silent> # :<C-U>
               \escape(@", '\\/.*$^~[]' ), "\n$", "", ""),
               \"\n", '\\_[[:return:]]', "g")<cr><cr>
               \:call setreg('"', old_reg, old_regmode)<cr>
+" This maps \y so that it will yank the visual selection and quote the regex
+" metacharacters. For example, use v to select some text; type \y; then type
+" CTRL-R" to insert the yanked selection with metacharacters escaped.
+vmap <silent> <leader>y y:let @"=substitute(escape(@",'.$*[^\/~'),'\n','\\n','g')<CR>
 
 " echo the date and time
 "map <leader>d :echo strftime("%Y-%m-%d %H:%M:%S")<CR>
 
-" spell check
+" tab support
+if version >= 700
+    map <S-left> :tabp<CR>
+    map <S-right> :tabn<CR>
+endif
+
 " <F2> or \s
+" spell check
 if version >= 700
     nnoremap <silent><F2> <ESC>:set spell!<CR>
     nnoremap <silent><leader>s <ESC>:set spell!<CR>
@@ -307,21 +352,34 @@ else " older versions use external aspell
     nnoremap <silent><leader>s <ESC>:!aspell -c "%"<CR>:edit! "%"<CR>
 endif
 
-" tab support
-if version >= 700
-    map <S-left> :tabp<CR>
-    map <S-right> :tabn<CR>
-endif
+" <F3>
+" toggle between dark and light backgrounds
+nnoremap <silent><F3> :let &background=(&background == "dark"?"light":"dark")<CR>
 
-" refresh - redraw window
+" <F4>
+" toggle mouse mode between VIM and xterm
+function ShowMouseMode()
+    if (&mouse == 'a')
+        echo "MOUSE VIM"
+    else
+        echo "MOUSE X11"
+    endif
+endfunction
+nnoremap <silent><F4> :let &mouse=(&mouse == "a"?"":"a")<CR>:call ShowMouseMode()<CR>
+
 " <F5>
+" refresh - redraw window
 nnoremap <silent><F5> :redraw!<CR>
 
+" <F6>
+" paste - toggle auto-format in insert mode to preserve formatting when
+nnoremap <silent><F6> :set paste!<CR>
+
+" <F7> or \r
 " This runs the current buffer in an X terminal that disappears after 5 minutes.
 " This needs the env var $TERM set to xterm or some compatible X11 terminal.
 " This does not save first!
-" <F7> or \r
-function RunBufferInTerm ()
+function RunBufferInTerm()
     if &filetype == 'python'
         silent !$TERM -bg black -fg green -e bash -c "python %; sleep 300" &
     elseif &filetype == 'sh'
@@ -341,23 +399,11 @@ nnoremap <silent><leader>r :call RunBufferInTerm()<CR>
 " yank all lines
 nnoremap <silent><F8> gg"+yG
 nnoremap <silent><leader>a gg"+yG
+
 " <F10> or \n
 " toggle line numbers
 nnoremap <silent><F10> :set number!<CR>
 nnoremap <silent><leader>n :set number!<CR>
-" <F3>
-" toggle between dark and light backgrounds
-nnoremap <silent><F3> :let &background=(&background == "dark"?"light":"dark")<CR>
-" <F4>
-" toggle mouse mode between VIM and xterm
-function ShowMouseMode()
-    if (&mouse == 'a')
-        echo "MOUSE VIM"
-    else
-        echo "MOUSE X11"
-    endif
-endfunction
-nnoremap <silent><F4> :let &mouse=(&mouse == "a"?"":"a")<CR>:call ShowMouseMode()<CR>
 
 " This is now covered by the DirDiff plugin.
 " extra diff support
@@ -397,7 +443,7 @@ function UniversalFoldExpression(lnum)
     endif
     "The first pattern matches C-like function syntax. It is fragile, but
     "works more or less bettern than not having it at all.
-    return (getline(a:lnum)=~"^[a-zA-Z_][a-zA-Z_0-9]*\\s\\+[^(;=,]\\+([^);=]*)\\s*$\\|^\\s*public function\\s\\|^\\s*private function\\s\\|^\\s*function\\s\\|^\\s*class\\s\\|^\\s*def\\s") ? ">1" : "="
+    return (getline(a:lnum)=~"^[[:alpha:]_][[:alpha:]_0-9]*\\s\\+[^(;=,]\\+([^);=]*)\\s*$\\|^\\s*public function\\s\\|^\\s*private function\\s\\|^\\s*function\\s\\|^\\s*class\\s\\|^\\s*def\\s\\|^[[:alpha:]_][[:alpha:]_0-9]*[[:space:]]*()[[:space:]]*{") ? ">1" : "="
 endfunction
 " This doesn't work quite right:
     "if &filetype == 'php'
@@ -413,6 +459,18 @@ endfunction
     "    return "="
     "endif
     " @/ is the register that holds the last search pattern.
+
+" This copies all matching text from all lines into the given register,
+"     :CopyMatches x
+" Note that this copies only the maching text, not the entire line
+" of the matching text. See http://vim.wikia.com/wiki/Copy_search_matches
+function! CopyMatches(reg)
+  let hits = []
+  %s//\=len(add(hits, submatch(0))) ? submatch(0) : ''/ge
+  let reg = empty(a:reg) ? '+' : a:reg
+  execute 'let @'.reg.' = join(hits, "\n") . "\n"'
+endfunction
+command! -register CopyMatches call CopyMatches(<q-reg>)
 
 " plugins
 runtime ftplugin/man.vim " allow vim to read man pages

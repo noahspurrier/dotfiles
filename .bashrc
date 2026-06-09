@@ -15,55 +15,62 @@
 # if not running interactively, don't do anything
 [ -z "$PS1" ] && return
 
+function get_realpath() {
+    if [ -d "$1" ]; then
+        cd "$1"
+    else
+        if [ "${1}" != "${1%/*}" ]; then
+            cd "${1%/*}"
+        fi
+    fi
+    realpath="$(pwd -P)"
+    cd - >/dev/null
+    if [ -d "$1" ]; then
+        echo "${realpath}"
+    else
+        echo "${realpath}/${1##*/}"
+    fi
+    return 0
+}
+
 # Default file permissions: rwxr-xr-x
 umask 022
 
-# Locale settings. Remember you may run `locale` to see LC_* settings.
-# LANG is the master source of locale information. All LC_* variables
-# will take the value of LANG if they are not already set.
-export LANG=C
-# LC_COLLATE is an exception no matter what locale you set.
+# Locale settings. You may run `locale` to see the LC_* settings in effect.
+# This may be different than the values seen in the environment. This is
+# because LC_ALL has precedence over everything including LANG, so,
+# for example, if makes no sense to set in the environment
+#     export LC_COLLATE=C
+#     export LC_ALL=en_US.UTF-8.
+# If you run 'locale' you will see that it uses "en_US.UTF-8" for LC_COLLATE.
+# You can check that the environment variable for LC_COLLATE still says C.
+# If you want to set a default for everything and then override a few
+# locale settings as needed then use LANG for this. LANG sets the default
+# locale used only if a given LC_* variable is not set.
+export LANG=en_US.UTF-8
+# Exceptions to LANG default.
 # Most low-level systems people will usually want it set to 'C'.
 # For example, if LC_COLLATE is set to "en_US.UTF-8" then a simple command
 # `ls -la` will ignore dots when sorting filenames. This will cause dotfiles
 # to be displayed mixed with regular files.
 export LC_COLLATE=C
+export LC_CTYPE=C
 
-# The following code allows this script to be source from anywhere.
-# From here on I use ${BASH_SOURCE} instead of ~/ or $HOME.
-# This removes the dependency on the absolute path to
-# a user's ~ home directory, so these files may be moved to other paths
-# or sourced by other users. For example, sometimes an account is shared
-# by multiple users, but each wants a different environment. A user may
-# source this script to update their environment just for their session.
-# This can even be done automatically by the LC_EXTRA_USER hack that
-# follows after this SOURCE_DIR definition.
-# FIXME: Mac OS X and Bash version 2.05b.0(1)-release
-# FIXME: do not have the BASH_SOURCE feature.
-if [ -r ${BASH_SOURCE} ] ; then
-    SOURCE_DIR=`readlink -e \`dirname ${BASH_SOURCE}\``
+# The following code allows this script to be sourced from anywhere.
+# From here on we use ${SOURCE_DIR} instead of ~/ or $HOME (except for the
+# LC_EXTRA_USER hook at the end of this .bashrc). This removes the dependency
+# on the absolute path to a user's ~ home directory, so these files may be
+# moved to other paths or sourced by other users. For example, sometimes an
+# account is shared by multiple users, but each wants a different environment.
+# A user may source this script to update their environment just for their
+# session. This can even be done automatically by the LC_EXTRA_USER super-hook
+# that should be defined near the end of this script.
+# FIXME: Mac OS X (before 10.8 (Mountain Lion)) and Bash before
+#        version 2.05b.0(1)-release do not have the BASH_SOURCE feature.
+if [ -r ${BASH_SOURCE[0]} ] ; then
+    SOURCE_DIR=$(get_realpath $(dirname ${BASH_SOURCE[0]}))
 else
-    SOURCE_DIR=`readlink -e ${PWD}/\`dirname ${BASH_SOURCE}\``
-fi
-
-# The following code loads extra user environment information.
-# This is a hack based on the fact that most SSH servers are configured
-# to allow clients to pass locale environment variables (LC_*).
-# On the client side this code will automatically assign the value of the
-# USER variable to LC_EXTRA_USER which the remote server allows to pass.
-# The remote server bashrc will check if LC_EXTRA_USER has been passed,
-# If LC_EXTRA_USER was passed then the remote server will source an extra
-# an extra environment script for that user. The user's extra environment
-# info should be defined under a dot directory based on the user's name.
-# Both client and server should have the following in their .bashrc files.
-# The same code works, without changes, for both the client and server side.
-if [ -z "${EXTRA_USER_SET}" ] ; then
-    export EXTRA_USER_SET=1 # Prevent recursive import of extra .bashrc.
-    if [ "${LC_EXTRA_USER}" ] ; then
-        [ -r ~/.${LC_EXTRA_USER}/.bashrc ] && source ~/.${LC_EXTRA_USER}/.bashrc
-    else
-        export LC_EXTRA_USER=${USER}
-    fi
+    SOURCE_DIR=$(get_realpath ${PWD}/$(dirname ${BASH_SOURCE[0]}))
 fi
 
 # Source /etc/bashrc -- do not confuse this with /etc/bash.bashrc
@@ -74,21 +81,23 @@ fi
 #export BACKGROUND='dark'
 
 # Set the PS1 prompt.
+# \033 is the ASCII escape code (octal , decimal 27, hex 1b).
+# See `bash` man page section "PROMPTING".
 case "${TERM}" in
     ansi*|vt10*|vt22*|cygwin*) # no color
     if [ $(id -u) -eq 0 ] ;
     then # root
-        PS1='\[\033[0;7;30;31m\]\D{%s} ?=$? \u@\H:$PWD\[\033[m\]\n\$ '
+        PS1='\[\033[0;7m\]\D{%s} ?=$? \u@\H:$PWD\[\033[0m\]\n\$ '
     else # normal user
-        PS1='\[\033[0;7m\]\D{%s} ?=$? \u@\H:$PWD\[\033[m\]\n\$ '
+        PS1='\[\033[0;7m\]\D{%s} ?=$? \u@\H:$PWD\[\033[0m\]\n\$ '
     fi
     ;;
     xterm*|rxvt*|screen*) # color (assume all xterms have color).
     if [ $(id -u) -eq 0 ] ;
     then # root
-	PS1='\[\033]0;\H:$PWD\007\033[7;91m\]\D{%s}\[\033[31m\] \[\033[91m\]?=$?\[\033[31m\] \[\033[91m\]\u@\H:$PWD\[\033[m\]\n\$ '
+        PS1='\[\033]0;\H:$PWD\007\033[0;7;91m\]\D{%s}\[\033[0;7;31m\] \[\033[0;7;91m\]?=$?\[\033[0;7;31m\] \[\033[0;7;91m\]\u@\H:$PWD\[\033[0m\]\n\$ '
     else # normal user
-	PS1='\[\033]0;\H:$PWD\007\033[7;92m\]\D{%s}\[\033[2;32m\] \[\033[0;7;92m\]?=$?\[\033[2;32m\] \[\033[7;92m\]\u@\H:$PWD\[\033[m\]\n\$ '
+        PS1='\[\033]0;\H:$PWD\007\033[0;7;92m\]\D{%s}\[\033[0;7;32m\] \[\033[0;7;92m\]?=$?\[\033[0;7;32m\] \[\033[0;7;92m\]\u@\H:$PWD\[\033[0m\]\n\$ '
     fi
     ;;
     *)
@@ -106,34 +115,49 @@ export VIMINIT="source ${SOURCE_DIR}/.vimrc"
 export PYTHONSTARTUP="${SOURCE_DIR}/.pythonrc.py"
 export SCREENRC="${SOURCE_DIR}/.screenrc"
 export LESS="-R"
-export PAGER="/bin/sh -c \"unset PAGER;col -b -x | \
+# Pick the best pager available.
+if type vim >/dev/null 2>/dev/null; then
+    export PAGER="/bin/sh -c \"unset PAGER;col -b -x | \
     vim -R -c 'set ft=man nomod nolist' -c 'set mouse=a' \
     -c 'map q :q<CR>' -c 'map <SPACE> <C-D>' -c 'map b <C-U>' \
     -c 'nmap K :Man <C-R>=expand(\\\"<cword>\\\")<CR><CR>' -\""
+elif type less >/dev/null 2>/dev/null; then
+    export PAGER="less"
+elif type more >/dev/null 2>/dev/null; then
+    export PAGER="more"
+else
+    unset PAGER
+fi
 export BROWSER=firefox
-export GZIP="-9"
-unset GREP_OPTIONS
-case $(grep --help) in
-    *'--color'*)
-    export GREP_OPTIONS="--color=auto";;
-    *)
-    export GREP_OPTIONS="";;
-esac
+if gunzip -V 2>/dev/null | grep -iq "free software foundation" ; then
+    export GZIP="-9"
+else
+    unset GZIP
+fi
+#unset GREP_OPTIONS
+#case $(grep --help 2>/dev/null) in
+#    *'--color'*)
+#    export GREP_OPTIONS="--color=auto";;
+#    *)
+#    unset GREP_OPTIONS
+#esac
 
 # Colorize directory listings. This works on both BSD and GNU.
 if ls --version 2>/dev/null | grep -iq "free software foundation" ; then
     # GNU ls
     eval "$(dircolors 2>/dev/null)"
     export LS_OPTIONS="--color=auto"
-else # BSD ls
+else # assume BSD ls
     export CLICOLOR=""
+    #export LS_OPTIONS="-Oe@"
+    export LS_OPTIONS="-O"
 fi
 
-if ls --group-directories-first / >/dev/null 2>&1 ; then
+if ls --group-directories-first / >/dev/null 2>/dev/null ; then
     export LS_OPTIONS="${LS_OPTIONS} --group-directories-first"
 fi
 
-if ls --time-style / >/dev/null 2>&1 ; then
+if ls --time-style / >/dev/null 2>/dev/null ; then
     export LS_OPTIONS="${LS_OPTIONS} --time-style=+%FT%T%:::z"
 fi
 
@@ -164,8 +188,9 @@ export TIMEFORMAT=$'\npcpu\t%P\nreal\t%3lR\nuser\t%3lU\nsys\t%3lS'
 # Tell sysstat use ISO 8601 time format.
 export S_TIME_FORMAT="ISO"
 
-# This may seem excessive, but even with timestamps it averages only 300K.
-export HISTSIZE=10000
+# Unlimited history.
+export HISTSIZE=
+export HISTFILESIZE=
 # date and time stamps in ISO 8601 format
 export HISTTIMEFORMAT="%FT%T "
 export HISTIGNORE="history:h:hg:nohist:miv:.dotfiles"
@@ -173,6 +198,8 @@ export HISTIGNORE="history:h:hg:nohist:miv:.dotfiles"
 export HISTCONTROL=ignoreboth
 # Allow editing of multi-line commands.
 shopt -s cmdhist
+# Store milti-line commands with embedded newlines in .bash_history.
+shopt -s lithist
 # Multiple shells append to history file rather than overwriting each other.
 # Append each session's history prior to issuing each primary prompt.
 # See http://www.ukuug.org/events/linux2003/papers/bash_tips/.
@@ -188,24 +215,24 @@ set -o ignoreeof
 # Check the window size after each command and if necessary
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
-## # Allow '.dotfiles" to be returned in path-name expansion.
-## shopt -s dotglob
+# Allow '.dotfiles" to be returned in path-name expansion.
+shopt -s dotglob
 # Turn on extended globbing.
 shopt -s extglob
 # Do not do completion on an empty command-line.
 shopt -s no_empty_cmd_completion
 
-# Silence the console bell.
-if type setterm >/dev/null 2>/dev/null; then
-    setterm -blength 0
-fi
+## Silence the console bell.
+#if type setterm >/dev/null 2>/dev/null; then
+#    setterm -blength 0
+#fi
 
 # If running X11 then change some settings.
-if [ "${DISPLAY}" ] && which xset >/dev/null ; then
+if [ "${DISPLAY}" ] && type xset >/dev/null 2>/dev/null ; then
     # Silence the X11 terminal bell.
-    xset b off >/dev/null 2>&1
+    xset b off >/dev/null 2>/dev/null
     # Add user's fonts to font path. Ignore errors if they don't have one.
-    xset fp+ ${SOURCE_DIR}/.fonts >/dev/null 2>&1
+    xset fp+ ${SOURCE_DIR}/.fonts >/dev/null 2>/dev/null
     ## # reload X11 .Xresources
     ## [ -r ${SOURCE_DIR}/.Xresources ] && xrdb -merge ${SOURCE_DIR}/.Xresources >/dev/null 2>&1
 fi
@@ -234,6 +261,28 @@ fi
 ##     echo "UPDATING DOTFILES"
 ##     (${SOURCE_DIR}/.dotfiles 2>&1 >/dev/null) &
 ## fi
+
+# The famous LC_EXTRA_USER super-hook.
+# The following code loads extra user environment information.
+# This is a trick based on the fact that most SSH servers are configured
+# by default to allow clients to pass any locale environment variable (LC_*).
+# On the client side this code will automatically assign the value of the
+# USER variable to LC_EXTRA_USER which the remote server allows to pass.
+# The remote server bashrc will check if LC_EXTRA_USER has been passed,
+# If LC_EXTRA_USER was passed then the remote server will source an extra
+# an extra environment script for that user. The user's extra environment
+# info should be defined under a dot directory based on the user's name.
+# Both client and server should have the following in their .bashrc files.
+# The same code works, without changes, for both the client and server side.
+if [ -z "${EXTRA_USER_SET}" ] ; then
+    export EXTRA_USER_SET=1  # Prevent recursive import of extra .bashrc.
+    if [ "${LC_EXTRA_USER}" ] ; then
+        [ -r "${HOME}/.${LC_EXTRA_USER}/.bashrc" ] && \
+            . "${HOME}/.${LC_EXTRA_USER}/.bashrc"
+    else
+        export LC_EXTRA_USER=${USER}
+    fi
+fi
 
 #
 # END OF SCRIPT .bashrc
@@ -302,3 +351,4 @@ fi
 ##     complete -A builtin builtin
 ## fi
 
+# vim: set ft=sh sr et ts=4 sw=4 : See help 'modeline'

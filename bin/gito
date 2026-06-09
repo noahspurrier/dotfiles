@@ -1,0 +1,27 @@
+#!/bin/sh
+
+REMOTE=$(git remote)
+# This can be misleading because it implies that the local branch of
+# the same name is tracking the remote of the same name, which may
+# not be true.
+REMOTE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+BRANCH=$(git symbolic-ref HEAD 2>/dev/null | sed "s/refs\/heads\///")
+if [ -z "${BRANCH}" ]; then
+    BRANCH="detached: $(git rev-parse HEAD 2>/dev/null)"
+fi
+CACHED=$(git diff --cached --name-only)
+MODIFIED_UNCACHED=$(git ls-files -m)
+LOCAL_TRACK_REMOTE=$(git config branch.${BRANCH}.remote)
+AHEAD_REMOTE_COUNT=$(git rev-list ${REMOTE}/${REMOTE_BRANCH}..HEAD | wc --lines)
+echo "----"
+echo "# Local: Remote"
+git for-each-ref --format='%(refname:short): %(upstream:short)' refs/heads
+echo "----"
+echo "Working Branch:      ${BRANCH}"
+echo "Remote:              ${REMOTE}"
+echo "Remote Branch:       ${REMOTE_BRANCH}"
+echo "Cached:              ${CACHED}"
+echo "Modified uncached:   ${MODIFIED_UNCACHED}"
+echo "Local Track Remote:  ${LOCAL_TRACK_REMOTE}"
+echo "Ahead Remote Count:  ${AHEAD_REMOTE_COUNT}"
+

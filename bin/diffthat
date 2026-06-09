@@ -1,0 +1,139 @@
+#!/bin/sh
+
+#
+# This give the diff between two runs of commands.
+#
+# SYNOPSIS
+#
+#     diffthis [COMMAND]
+#     diffthat [COMMAND]
+#
+# DESCRIPTION
+#
+#     This give the diff between two runs of commands. First run a command and
+#     cache the output in tmp. Later the user may request the diff between the
+#     cached output and the output of a new command. This basically does little
+#     more than what you might do manually:
+#
+#         ls -latr /dev >/tmp/temp_data_for_diff
+#         ls -latr /dev | diff -u /tmp/temp_data_for_diff -
+#
+#    Note that the '''diffthat''' is not a separate script. It should just be a
+#    symlink to '''diffthis'''.
+#        ln -s diffthis diffthat
+#
+#    Stderr output is not currently handled; although, the script has
+#    preliminary code handling stderr to support this in the future. By default
+#    stderr is mixed into stdout and becomes part of the diff. If you with to
+#    ignore stderr then pass the '-E' option and stderr will be sent to
+#    /dev/null. If you wish to preserve stderr, but diff it separately from
+#    stdout then pass the '-e' option and stderr will be sent to a separate log
+#    file and diffed separately.
+#
+#    Beware of shell aliases and functions. You may have 'ls' aliased to 'ls
+#    ${LS_OPTIONS}' which will cause it to run differently than the default.
+#    This tool does not resolve aliases, functions, that may shadow default
+#    behavior of a command.
+#
+#
+# EXAMPLES
+#
+#	diffthis ls -latr /dev diffthat ls -latr /dev
+#
+#	diffthis ls /proc diffthat ls /proc
+#
+# EXIT STATUS
+#
+#     This exits with status 0 on success or non-zero on error.
+#
+# AUTHOR
+#
+#     Noah Spurrier noah@noah.org
+#
+# LICENSE
+#
+#     This license is OSI and FSF approved as GPL-compatible. This license
+#     identical to the ISC License and is registered with and approved by the
+#     Open Source Initiative. For more information vist:
+#     http://opensource.org/licenses/isc-license.txt
+#
+#     Copyright (c)2015 Noah Spurrier noah@noah.org
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# VERSION
+#
+#     Version 1
+#
+######################################################################
+
+function get_realpath() {
+        if [ -d "$1" ]; then
+                cd "$1"
+        else
+                if [ "${1}" != "${1%/*}" ]; then
+                        cd "${1%/*}"
+                fi
+        fi
+        realpath="$(pwd -P)"
+        cd - >/dev/null
+        if [ -d "$1" ]; then
+                echo "${realpath}"
+        else
+                echo "${realpath}/${1##*/}"
+        fi
+        return 0
+}
+
+# This sets variables which record where the script was started from and
+# where the script itself is installed.
+PWD="$(pwd)"
+START_DIRECTORY="${PWD}"
+if [ -x "$0" ]; then
+        COMMAND="$(get_realpath "$0")"
+else
+        COMMAND="$(get_realpath "${PWD}/$0")"
+fi
+INSTALLDIR="$(dirname "${COMMAND}")"
+
+FILENAME_DIFFTHIS="/tmp/diffthis-$(id -u)$(tty|tr / -)"
+if [ "$1" = "-e" ]; then
+	FILENAME_DIFFTHIS_STDERR="/tmp/diffthis-stderr-$(id -u)$(tty|tr / -)"
+	shift
+elif [ "$1" = "-E" ]; then
+	FILENAME_DIFFTHIS_STDERR="/dev/null"
+	shift
+fi
+echo $@
+
+case "$0" in
+	*that*)
+		echo "# Behave as diffthat (compete the diff)."
+		FILENAME_DIFFTHIS="/tmp/diffthis-$(id -u)$(tty|tr / -)"
+		$@ | diff -us "${FILENAME_DIFFTHIS}" -
+		exit 0
+		;;
+esac
+
+if [ -n "${FILENAME_DIFFTHIS_STDERR}" ]; then
+	$@ >"${FILENAME_DIFFTHIS}" 2>"${FILENAME_DIFFTHIS_STDERR}"
+else
+	$@ >"${FILENAME_DIFFTHIS}" 2>&1
+fi
+if [ -n "${FILENAME_DIFFTHIS_STDERR}" ]; then
+	echo "Output saved to ${FILENAME_DIFFTHIS} and ${FILENAME_DIFFTHIS_STDERR}."
+	echo "Run 'diffthat' to complete the diff."
+else
+	echo "Output saved to ${FILENAME_DIFFTHIS}."
+	echo "Run 'diffthat' to complete the diff."
+fi

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+declare -a VIOLETS=(53 54 55 56 57 89 90 91 92 93 127 128 129)
+
+tput civis 2>/dev/null
+tput smcup 2>/dev/null
+trap "tput rmcup; tput cnorm 2>/dev/null; exit 0" SIGINT
+
+# This is an alternative to `tput`, for no good reason.
+#function term_size() {
+#	{ read -p $'\e[18t' -s -r -d t size; } <> /dev/tty
+#     	echo ${size#*;}
+#}
+#function term_cols () {
+#	ts=$(term_size)
+#	LINES=${ts/*;}
+#}
+#function term_lines () {
+#	ts=$(term_size)
+#	COLUMNS=${ts/;*}
+#}
+
+function winch_handler() {
+	# This adds processing after the terminal handles SIGWINCH.
+	# First, pass the SIGWINCH back to the terminal because
+	# we can't get the new size until the terminal sees SIGWINCH.
+	trap - SIGWINCH
+	kill -SIGWINCH $$
+	# Now `tput` can query the terminal for the new size.
+	COLUMNS=$(tput cols)
+	LINES=$(tput lines)
+	# Install the trap so this handler will function in the future.
+	trap "winch_handler" SIGWINCH
+}
+# The winch_handler must be called once explicitly to
+# initialize COLUMNS and LINES, and to install the signal trap.
+winch_handler
+
+one_random_violet_dot() {
+	echo -en "\033[$((RANDOM%LINES+1));$((RANDOM%COLUMNS+1))H"
+	echo -en "\033[48;5;${VIOLETS[$((RANDOM%13))]}m "
+	echo -en "\033[m"
+}
+
+random_violet_dots() {
+	while :; do
+		one_random_violet_dot
+		sleep .01
+	done
+}
+
+clear
+random_violet_dots
+
+#
+#     ""`...____        _.---...,""
+#     \         ".    ."          /
+#     |           \  /            |
+#     |      _              _     |
+#     |   .'"      ()        `.   |
+#      \ /        /||\         \ /
+#       |      )   /\   (       |
+#       |     /          \      |
+#        \   |            |    /
+#         `--'\          /`--"
+#              `-.____.-'
+#
+-

@@ -1,38 +1,48 @@
-#set editing-mode vi
-#set keymap vi
+# inputrc
+# This tunes how the readline library behaves. This is most often encountered
+# when using Bash. This is normally located in ~/.inputrc or /etc/inputrc.
 
-# If there is any text in front of the cursor then up and down
-# do history search, otherwise up and down do normal history prev/next.
+# This is easily the most useful setting in this file.
+# This enables the up and down arrow keys to do normal history browsing when
+# starting with an empty command-line, but if you type the first few characters
+# of a command you want to search for in history then the up and down arrow
+# keys will perform a history search.
 "\e[B": history-search-forward
 "\e[A": history-search-backward
+#set history-preserve-point on
 
-# allow the use of the Home/End keys
+# This enables use of the Home and End keys.
 "\e[1~": beginning-of-line
 "\e[4~": end-of-line
 
-# allow the use of the Delete/Insert keys
+# This enables the use of the Delete and Insert keys.
 "\e[3~": delete-char
 "\e[2~": quoted-insert
 
-# mappings for Ctrl-left-arrow and Ctrl-right-arrow for word moving
-"\e[1;5C": forward-word
-"\e[1;5D": backward-word
-"\e[5C": forward-word
-"\e[5D": backward-word
+# This enables the use of the Alt-left and Alt-right arrow keys to
+# move the cursor by a word at a time.
 "\e\e[C": forward-word
 "\e\e[D": backward-word
+"\e[1;3C": forward-word
+"\e[1;3D": backward-word
 
+# These options control TAB completion.
+#
+# This turns off the bell ringing when doing TAB completion.
+set bell-style none
+# This immediately shows all ambiguous matches when using Tab completion.
+# No more beep and hitting Tab twice to get view the matches, just show them.
 set show-all-if-ambiguous on
-set show-all-if-unmodified on
+# Similar to show-all-if-ambiguous but needs two Tabs to get completion list.
+#set show-all-if-unmodified on
+# Never ask if the user wants to view matches, just show them.
 set completion-query-items -1
+# Don't use a pager when showing matches.
 set page-completions off
+# I normally hate horizontal lists, but in this case it's easier to read.
 set print-completions-horizontally on
-#set history-preserve-point on
 
 $if bash
-## This was extremely annoying.
-##    # space will expand "!" history items.
-##    Space: magic-space
     set match-hidden-files off
     set visible-stats on
     set completion-ignore-case on
