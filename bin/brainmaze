@@ -13,7 +13,7 @@ DESCRIPTION
 
     The algorithm works like this. First four sub-mazes are generated and
     arranged into four quadrants. Then they are joined in three random places
-    along the horizontal and vertical boundaries of the four quandrants. This
+    along the horizontal and vertical boundaries of the four quadrants. This
     is repeated until you get tired.
 
         ### ###     ### ###
@@ -72,7 +72,13 @@ VERSION
 
     2
 """
+from __future__ import print_function
 
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from builtins import object
 import sys, os, traceback, optparse
 import time
 import random
@@ -81,7 +87,7 @@ import cgi
 WALL = ' '
 PASSAGE = '#'
 
-class Maze:
+class Maze(object):
 
     """This class stores the state of a maze. It does not contain the algorithm
     that generates a maze. Note that this stores the maze "graphically" and not
@@ -99,7 +105,7 @@ class Maze:
     to convert it to tree structure, but that becomes yet another fun exercise!
 
     The size is the number of fractal cells along one side. A single fractal
-    cell is actually made up of up of 4 nodes. This algorithm assumes a square,
+    cell is actually made up of 4 nodes. This algorithm assumes a square,
     so both sides get the same size."""
 
     def __init__ (self, size, init_value):
@@ -127,6 +133,8 @@ class Maze:
         for y in range(self.size):
             for x in range(self.size):
                 value = self.get(x,y)
+                if value == PASSAGE:
+                    value = "\033[40m#\033[0m"
                 s = s + value
             s = s + '\n'
         return s
@@ -265,11 +273,11 @@ def join4 (g1, g2, g3, g4):
     place to connect the mazes. It does this by hunting through the middle
     horizontal or vertical until it finds a space that has a PASSAGE both above
     and below OR both left and right. Then it puts a PASSAGE between those two
-    PASSAGEs. The reason there are two choices is because there must be a total
+    PASSAGEs. The reason there are two choices is that there must be a total
     of three connectors between the four mazes. Two connecting PASSAGEs must be
     on the same row OR column, the third PASSAGE must be in the line at right
     angles two the first two. (I NEED A DAMN PICTURE TO EXPLAIN THIS PROPERLY!)
-    So you can have two connectors in a row and one connector in a column or
+    So you can have two connectors in a row and one connector in a column, or
     you can have one connector in a row and two connectors in a column. It's
     YOUR choice. But they have to be in that configuration. In other words you
     just have to make sure that the row and column has at least one connector.
@@ -279,7 +287,7 @@ def join4 (g1, g2, g3, g4):
     connections occur in the horizontal or vertical wall between the four
     mazes. They may also connect in the middle if there happens to be two
     connections on either side. That means that the third connection is
-    dependant on the first two. And THAT means there is an order dependency. To
+    dependent on the first two. And THAT means there is an order dependency. To
     remove this dependency I have to add another random step -- I have to
     randomly choose to connect horizontally or vertically first."""
 
@@ -376,14 +384,14 @@ def memoize (f):
         return cache[x]
     return memoize_function
 
-class MemoizeMutable:
+class MemoizeMutable(object):
     def __init__(self, fn):
         self.fn = fn
         self.memo = {}
     def __call__(self, *args, **kwds):
-        import cPickle
-        str = cPickle.dumps(args, 1)+cPickle.dumps(kwds, 1)
-        if not self.memo.has_key(str):
+        import pickle
+        str = pickle.dumps(args, 1)+pickle.dumps(kwds, 1)
+        if str not in self.memo:
             self.memo[str] = self.fn(*args, **kwds)
         return self.memo[str]
 
@@ -397,8 +405,8 @@ def fill_adjacency_distance_matrix (adj_matrix):
     done = False
     while not done:
         done = True
-        for key_node, dist_dict in adj_matrix.items():
-            for node, dist in dist_dict.items():
+        for key_node, dist_dict in list(adj_matrix.items()):
+            for node, dist in list(dist_dict.items()):
                 if dist is None:
                     dist = get_distance (adj_matrix, key_node, node)
                     if dist is not None:
@@ -418,7 +426,7 @@ def get_distance (adj_matrix, node1, node2):
     dist = adj_matrix[node1][node2]
     if dist is not None:
         return dist
-    for node3 in adj_matrix[node1].keys():
+    for node3 in list(adj_matrix[node1].keys()):
         if node3 == node1:
             continue
         dist = adj_matrix[node1][node3]
@@ -436,38 +444,38 @@ def main ():
     global options, args
 
     # If running as a CGI then force HTML output.
-    if os.environ.has_key('REQUEST_METHOD'):
+    if 'REQUEST_METHOD' in os.environ:
         options.html = True
 
     if options.html:
-        print "Content-Type: text/html"
-        print
+        print("Content-Type: text/html")
+        print()
 
     my_maze = build(args[0])
 
     if options.solve:
-        if options.verbose: print "Solving maze..."
+        if options.verbose: print("Solving maze...")
         tree = build_tree_from_maze (my_maze)
         adj = build_adjacency_distance_matrix (tree)
-        print "fill_adjacency_distance_matrix"
-        print time.time()
+        print("fill_adjacency_distance_matrix")
+        print(time.time())
         adj = fill_adjacency_distance_matrix (adj)
-        print time.time()
+        print(time.time())
         max_d = None
-        for key_node, dist_dict in adj.items():
-            for node, dist in dist_dict.items():
+        for key_node, dist_dict in list(adj.items()):
+            for node, dist in list(dist_dict.items()):
                 if dist is not None:
                     if max_d is None or adj[max_d[0]][max_d[1]] <= dist:
                         max_d=(key_node, node)
-        if options.verbose: print "distance from node",max_d[0],"to node",max_d[1], "->", adj[max_d[0]][max_d[1]]
+        if options.verbose: print("distance from node",max_d[0],"to node",max_d[1], "->", adj[max_d[0]][max_d[1]])
         # Mark the beginning and end of the two most distant nodes.
         my_maze.put(max_d[0][0],max_d[0][1],'B')
         my_maze.put(max_d[1][0],max_d[1][1],'E')
 
     if options.html:
-        print my_maze.html_table(9)
+        print(my_maze.html_table(9))
     else:
-        print str(my_maze)
+        print(str(my_maze))
 
 if __name__ == '__main__':
     try:
@@ -481,19 +489,19 @@ if __name__ == '__main__':
             args.append (4)
         else:
             args[0] = int(args[0])
-        if options.verbose: print time.asctime()
+        if options.verbose: print(time.asctime())
         main()
-        if options.verbose: print time.asctime()
-        if options.verbose: print 'TOTAL TIME IN MINUTES:',
-        if options.verbose: print (time.time() - start_time) / 60.0
+        if options.verbose: print(time.asctime())
+        if options.verbose: print('TOTAL TIME IN MINUTES:', end=' ')
+        if options.verbose: print((time.time() - start_time) / 60.0)
         sys.exit(0)
-    except KeyboardInterrupt, e: # Ctrl-C
+    except KeyboardInterrupt as e: # Ctrl-C
         raise e
-    except SystemExit, e: # sys.exit()
+    except SystemExit as e: # sys.exit()
         raise e
-    except Exception, e:
-        print 'ERROR, UNEXPECTED EXCEPTION'
-        print str(e)
+    except Exception as e:
+        print('ERROR, UNEXPECTED EXCEPTION')
+        print(str(e))
         traceback.print_exc()
         os._exit(1)
 
